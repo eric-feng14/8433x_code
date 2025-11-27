@@ -171,26 +171,26 @@ void competition_initialize() {}
  * from where it left off.
  */
 void autonomous() {
-	pros::lcd::set_text(0, "AUTON START");
+  pros::lcd::set_text(0, "AUTON START");
 
-	// Ensure starting pose is defined for LemLib (x, y in inches, theta deg)
-	chassis.setPose(0, 0, 0);
+  // Ensure starting pose is defined for LemLib (x, y in inches, theta deg)
+  chassis.setPose(0, 0, 0);
 
-	// Run intake while driving to the target point
-	intake.move(127);
-	chassis.moveToPoint(0, 50, 3000, {.forwards = true});
-	chassis.waitUntilDone();
-	intake.move(0);
+  // Run intake while driving to the target point
+  intake.move(127);
+  chassis.moveToPoint(0, 50, 3000, {.forwards = true});
+  chassis.waitUntilDone();
+  intake.move(0);
 
-	// Then drive forward using direct motor control for 2 seconds
-	left_motors.move(100);
-	right_motors.move(100);
-	pros::delay(2000);
+  // Then drive forward using direct motor control for 2 seconds
+  left_motors.move(100);
+  right_motors.move(100);
+  pros::delay(2000);
 
-	left_motors.move(0);
-	right_motors.move(0);
+  left_motors.move(0);
+  right_motors.move(0);
 
-	pros::lcd::set_text(1, "AUTON END");
+  pros::lcd::set_text(1, "AUTON END");
 }
 
 /**
