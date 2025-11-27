@@ -80,16 +80,117 @@ void opcontrol() {
 	pros::MotorGroup right_mg({-4, 5, -6});  // Creates a motor group with forwards port 5 and reversed ports 4 & 6
 
 
-	while (true) {
-		pros::lcd::print(0, "%d %d %d", (pros::lcd::read_buttons() & LCD_BTN_LEFT) >> 2,
-		                 (pros::lcd::read_buttons() & LCD_BTN_CENTER) >> 1,
-		                 (pros::lcd::read_buttons() & LCD_BTN_RIGHT) >> 0);  // Prints status of the emulated screen LCDs
+		while (true)
+	{
+		
+		// get left y and right x positions
+        int leftY = controller.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y);
+        int rightX = controller.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_X);
 
-		// Arcade control scheme
-		int dir = master.get_analog(ANALOG_LEFT_Y);    // Gets amount forward/backward from left joystick
-		int turn = master.get_analog(ANALOG_RIGHT_X);  // Gets the turn left/right from right joystick
-		left_mg.move(dir - turn);                      // Sets left motor voltage
-		right_mg.move(dir + turn);                     // Sets right motor voltage
-		pros::delay(20);                               // Run for 20 ms then update
+        // move the robot
+        chassis.curvature(leftY, rightX);
+
+		// Intake control with L1 (forward) and L2 (reverse)
+		if (controller.get_digital(DIGITAL_R1))
+		{
+			intake.move(127); // Full speed forward
+			hook.move(-100);  // Full speed forward
+		}
+		else if (controller.get_digital(DIGITAL_R2))
+		{
+			hook.move(100);	   // Full speed forward
+			intake.move(-127); // Full speed reverse
+		}
+		else
+		{
+			hook.move(0);	// Full speed forward
+			intake.move(0); // Stop if neither button is pressed
+		}
+
+		// // hook control with R1 (forward) and R2 (reverse)
+
+		// Auto-arm toggle using Y button
+		bool currentY = controller.get_digital(DIGITAL_Y);
+		if (currentY && !autoArmLastY)
+		{
+			autoArmEnabled = !autoArmEnabled;
+			if (autoArmEnabled)
+				autoTargetArm = initialArm + 40;
+		}
+		autoArmLastY = currentY;
+
+		int currentArm = arm_encoder.get_value();
+
+		// When auto-arm is enabled, use PID (adjust target faster with L buttons)
+		if (autoArmEnabled)
+		{
+			// Adjust the target if L1/L2 is pressed (faster adjustment)
+			if (controller.get_digital(DIGITAL_L1))
+				autoTargetArm += 3; // Increase target faster
+			if (controller.get_digital(DIGITAL_L2))
+				autoTargetArm -= 3; // Decrease target faster
+
+			// PID control to hold the arm at the autoTargetArm position
+			int error = autoTargetArm - currentArm;
+			pidIntegral += error * dt; // dt = 20ms for rotaitonal sensor, we are using 10ms for shaft encoder
+			int derivative = (error - lastError) / dt;
+			int pidOutput = static_cast<int>(Kp * error + Ki * pidIntegral + Kd * derivative);
+			lastError = error;
+			// Clamp output
+			if (pidOutput > 127)
+				pidOutput = 127;
+			if (pidOutput < -127)
+				pidOutput = -127;
+			arm.move(pidOutput);
+		}
+		else // When auto-arm is off, manual control is full (PID is bypassed)
+		{
+			pidIntegral = 0;
+			lastError = 0;
+			if (controller.get_digital(DIGITAL_L1))
+			{
+				arm.move(60);
+			}
+			else if (controller.get_digital(DIGITAL_L2))
+			{
+				arm.move(-60);
+			}
+			else
+			{
+				arm.move(0);
+			}
+		}
+
+		// Single-action solenoid control for clamp
+		static bool clamp_state = false;
+		static bool clamp_last_a_state = false;
+		bool clamp_current_a_state = controller.get_digital(DIGITAL_A);
+
+		// Toggle state on button press (not hold)
+		if (clamp_current_a_state && !clamp_last_a_state)
+		{
+			clamp_state = !clamp_state;
+		}
+		clamp_last_a_state = clamp_current_a_state;
+
+		// Set solenoid based on toggled state
+		clamp.set_value(clamp_state);
+
+		// Single-action solenoid control for doinker
+		static bool doinker_state = false;
+		static bool doinker_last_x_state = false;
+		bool doinker_current_x_state = controller.get_digital(DIGITAL_X);
+
+		// Toggle state on button press (not hold)
+		if (doinker_current_x_state && !doinker_last_x_state)
+		{
+			doinker_state = !doinker_state;
+		}
+		doinker_last_x_state = doinker_current_x_state;
+
+		// Set solenoid based on toggled state
+		doinker.set_value(doinker_state);
+
+		pros::delay(20);
 	}
 }
