@@ -180,17 +180,6 @@ void autonomous()
 	// Set the initial pose of the robot (x, y, heading)
 	chassis.setPose(0, 0,-40); // Start position: 1 tile from right edge, facing backwards
 	
-	// Moves the arm only
-	clamp.set_value(false);
-	arm.move(90);
-	pros::delay(1500);
-	arm.move(-90);
-	pros::delay(1000);
-	arm.move(0);
-	// left_motors.move(-80);
-	// right_motors.move(-80);
-
-
 	chassis.moveToPoint(1, -35, 3000, {.forwards = false});
 
 	// Clamp the mobile goal
