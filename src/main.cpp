@@ -178,13 +178,29 @@ void competition_initialize() {}
 void autonomous()
 {
 	// Set the initial pose of the robot (x, y, heading)
-	chassis.setPose(0, 0, 0); // Start position: 1 tile from right edge, facing backwards
+	chassis.setPose(0, 0,-40); // Start position: 1 tile from right edge, facing backwards
 	
-	intake.move(127); // Start intake at full speed
-	chassis.moveToPoint(0, 50, 3000, {.forwards = true});
-	intake.move(0); // Stop intake
+	chassis.moveToPoint(1, -35, 3000, {.forwards = false});
 
+	// Clamp the mobile goal
+	clamp.set_value(true);
+	pros::delay(1500);
+	clamp.set_value(false);
+	chassis.moveToPoint(1, -47, 2000, {.forwards = false});
+	chassis.moveToPoint(1, -41, 500);
+	chassis.moveToPoint(1, -46.5, 500, {.forwards = false});
+
+
+	intake.move(127);
+	hook.move(-100);
+
+
+	chassis.moveToPoint(20, -41.5, 3000);
+	chassis.moveToPoint(20, -57, 3000);
+	chassis.moveToPoint(25, -57, 3000);
+	
 }
+i
 
 
 /**
