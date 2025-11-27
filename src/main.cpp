@@ -18,10 +18,6 @@ lemlib::Drivetrain drivetrain(&left_motors,               // left motor group
 pros::Imu imu(10);
 
 pros::Motor intake(6);
-pros::Motor hook(-11);
-
-pros::ADIDigitalOut clamp('H');
-pros::ADIDigitalOut doinker('G');
 
 // input curve for throttle input during driver control
 lemlib::ExpoDriveCurve
@@ -214,8 +210,6 @@ void autonomous() {
 pros::Controller controller(pros::E_CONTROLLER_MASTER);
 
 void opcontrol() {
-  static bool clamp_state = false;
-
   while (true) {
     // get left y and right x positions
     int leftY = controller.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y);
@@ -224,44 +218,14 @@ void opcontrol() {
     // move the robot
     chassis.curvature(leftY, rightX);
 
-    // Intake control with L1 (forward) and L2 (reverse)
+    // Intake control with R1 (forward) and R2 (reverse)
     if (controller.get_digital(DIGITAL_R1)) {
       intake.move(127); // Full speed forward
-      hook.move(-100);  // Full speed forward
     } else if (controller.get_digital(DIGITAL_R2)) {
-      hook.move(100);    // Full speed forward
       intake.move(-127); // Full speed reverse
     } else {
-      hook.move(0);   // Full speed forward
       intake.move(0); // Stop if neither button is pressed
     }
-
-    // Set solenoid based on toggled state
-    clamp.set_value(clamp_state);
-
-    // Single-action solenoid control for clamp
-    static bool clamp_last_a_state = false;
-    bool clamp_current_a_state = controller.get_digital(DIGITAL_A);
-
-    // Toggle state on button press (not hold)
-    if (clamp_current_a_state && !clamp_last_a_state) {
-      clamp_state = !clamp_state;
-    }
-    clamp_last_a_state = clamp_current_a_state;
-
-    // Single-action solenoid control for doinker
-    static bool doinker_state = false;
-    static bool doinker_last_x_state = false;
-    bool doinker_current_x_state = controller.get_digital(DIGITAL_X);
-
-    // Toggle state on button press (not hold)
-    if (doinker_current_x_state && !doinker_last_x_state) {
-      doinker_state = !doinker_state;
-    }
-    doinker_last_x_state = doinker_current_x_state;
-
-    // Set solenoid based on toggled state
-    doinker.set_value(doinker_state);
 
     pros::delay(20);
   }
