@@ -152,6 +152,7 @@ void autonomous() {
   // Run intake while driving to the target point
   intake.move(127);
   chassis.moveToPoint(0, 50, 3000, {.forwards = true});
+  chassis.waitUntilDone();
   intake.move(0);
 
   // Then drive forward using direct motor control for 2 seconds
