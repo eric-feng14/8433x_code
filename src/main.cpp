@@ -21,6 +21,7 @@ pros::Motor intake(6);
 pros::Motor hook(-11);
 
 pros::ADIDigitalOut clamp('H');
+pros::ADIDigitalOut doinker('G');
 
 // input curve for throttle input during driver control
 lemlib::ExpoDriveCurve
@@ -36,31 +37,59 @@ lemlib::ExpoDriveCurve
                 1.019 // expo curve gain
     );
 
-// lateral motion controller
-// lemlib::ControllerSettings
-//     lateral_controller(10,  // proportional gain (kP)
-//                        0,   // integral gain (kI)
-//                        3,   // derivative gain (kD)
-//                        3,   // anti windup
-//                        1,   // small error range, in inches
-//                        100, // small error range timeout, in milliseconds
-//                        3,   // large error range, in inches
-//                        500, // large error range timeout, in milliseconds
-//                        20   // maximum acceleration (slew)
-//     );
+// // lateral PID controller
+// lemlib::ControllerSettings lateral_controller(0, // proportional gain (kP)
+//                                               0, // integral gain (kI)
+//                                               0, // derivative gain (kD)
+//                                               0, // anti windup
+//                                               0, // small error range, in
+//                                               inches 0, // small error range
+//                                               timeout, in milliseconds 0, //
+//                                               large error range, in inches 0,
+//                                               // large error range timeout,
+//                                               in milliseconds 0 // maximum
+//                                               acceleration (slew)
+// );
 
-// // angular motion controller
-// lemlib::ControllerSettings
-//     angular_controller(2,   // proportional gain (kP)
-//                        0,   // integral gain (kI)
-//                        10,  // derivative gain (kD)
-//                        3,   // anti windup
-//                        1,   // small error range, in degrees
-//                        100, // small error range timeout, in milliseconds
-//                        3,   // large error range, in degrees
-//                        500, // large error range timeout, in milliseconds
-//                        0    // maximum acceleration (slew)
-//     );
+// // angular PID controller
+// lemlib::ControllerSettings angular_controller(21, // proportional gain (kP)
+//                                               0, // integral gain (kI)
+//                                               155,// derivative gain (kD)
+//                                               0, // anti windup
+//                                               0, // small error range, in
+//                                               degrees 0, // small error range
+//                                               timeout, in milliseconds 0, //
+//                                               large error range, in degrees
+//                                               0, // large error range
+//                                               timeout, in milliseconds 0 //
+//                                               maximum acceleration (slew)
+// );
+
+// lateral motion controller
+lemlib::ControllerSettings
+    lateral_controller(10,  // proportional gain (kP)
+                       0,   // integral gain (kI)
+                       3,   // derivative gain (kD)
+                       3,   // anti windup
+                       1,   // small error range, in inches
+                       100, // small error range timeout, in milliseconds
+                       3,   // large error range, in inches
+                       500, // large error range timeout, in milliseconds
+                       20   // maximum acceleration (slew)
+    );
+
+// angular motion controller
+lemlib::ControllerSettings
+    angular_controller(2,   // proportional gain (kP)
+                       0,   // integral gain (kI)
+                       10,  // derivative gain (kD)
+                       3,   // anti windup
+                       1,   // small error range, in degrees
+                       100, // small error range timeout, in milliseconds
+                       3,   // large error range, in degrees
+                       500, // large error range timeout, in milliseconds
+                       0    // maximum acceleration (slew)
+    );
 
 lemlib::OdomSensors sensors(
     nullptr, // vertical tracking wheel 1, set to null
@@ -70,9 +99,11 @@ lemlib::OdomSensors sensors(
              // second one
     &imu);   // inertial sensor
 
-// create the chassis (no custom PID settings)
-lemlib::Chassis chassis(drivetrain, // drivetrain settings
-                        sensors,    // odometry sensors (left, middle, right)
+// create the chassis
+lemlib::Chassis chassis(drivetrain,         // drivetrain settings
+                        lateral_controller, // lateral PID settings
+                        angular_controller, // angular PID settings
+                        sensors, // odometry sensors (left, middle, right)
                         &throttle_curve, &steer_curve);
 
 /**
@@ -144,26 +175,26 @@ void competition_initialize() {}
  * from where it left off.
  */
 void autonomous() {
-  pros::lcd::set_text(0, "AUTON START");
+	pros::lcd::set_text(0, "AUTON START");
 
-  // Ensure starting pose is defined for LemLib (x, y in inches, theta deg)
-  chassis.setPose(0, 0, 0);
+	// Ensure starting pose is defined for LemLib (x, y in inches, theta deg)
+	chassis.setPose(0, 0, 0);
 
-  // Run intake while driving to the target point
-  intake.move(127);
-  chassis.moveToPoint(0, 50, 3000, {.forwards = true});
-  chassis.waitUntilDone();
-  intake.move(0);
+	// Run intake while driving to the target point
+	intake.move(127);
+	chassis.moveToPoint(0, 50, 3000, {.forwards = true});
+	chassis.waitUntilDone();
+	intake.move(0);
 
-  // Then drive forward using direct motor control for 2 seconds
-  left_motors.move(100);
-  right_motors.move(100);
-  pros::delay(2000);
+	// Then drive forward using direct motor control for 2 seconds
+	left_motors.move(100);
+	right_motors.move(100);
+	pros::delay(2000);
 
-  left_motors.move(0);
-  right_motors.move(0);
+	left_motors.move(0);
+	right_motors.move(0);
 
-  pros::lcd::set_text(1, "AUTON END");
+	pros::lcd::set_text(1, "AUTON END");
 }
 
 /**
@@ -217,6 +248,20 @@ void opcontrol() {
       clamp_state = !clamp_state;
     }
     clamp_last_a_state = clamp_current_a_state;
+
+    // Single-action solenoid control for doinker
+    static bool doinker_state = false;
+    static bool doinker_last_x_state = false;
+    bool doinker_current_x_state = controller.get_digital(DIGITAL_X);
+
+    // Toggle state on button press (not hold)
+    if (doinker_current_x_state && !doinker_last_x_state) {
+      doinker_state = !doinker_state;
+    }
+    doinker_last_x_state = doinker_current_x_state;
+
+    // Set solenoid based on toggled state
+    doinker.set_value(doinker_state);
 
     pros::delay(20);
   }
