@@ -1,4 +1,5 @@
 #include "main.h"
+#include "lemlib/api.hpp" // IWYU pragma: keep
 
 /**
  * A callback function for LLEMU's center button.
