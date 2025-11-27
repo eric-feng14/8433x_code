@@ -178,13 +178,123 @@ void competition_initialize() {}
 void autonomous()
 {
 	// Set the initial pose of the robot (x, y, heading)
-	chassis.setPose(0, 0, 0); // Start position: 1 tile from right edge, facing backwards
+	chassis.setPose(0, 0,-40); // Start position: 1 tile from right edge, facing backwards
 	
-	intake.move(127); // Start intake at full speed
-	chassis.moveToPoint(0, 50, 3000, {.forwards = true});
-	intake.move(0); // Stop intake
+	// Moves the arm only
+	clamp.set_value(false);
+	arm.move(90);
+	pros::delay(1500);
+	arm.move(-90);
+	pros::delay(1000);
+	arm.move(0);
+	// left_motors.move(-80);
+	// right_motors.move(-80);
 
+
+	chassis.moveToPoint(1, -35, 3000, {.forwards = false});
+
+
+
+
+
+	// // Turn to 270 and move backwards to (24, 0)
+	// chassis.moveToPoint(-24,24, 1000, {.forwards = false});
+	// pros::delay(200);
+
+	// Clamp the mobile goal
+	clamp.set_value(true);
+	pros::delay(1500);
+	clamp.set_value(false);
+	chassis.moveToPoint(1, -47, 2000, {.forwards = false});
+	chassis.moveToPoint(1, -41, 500);
+	chassis.moveToPoint(1, -46.5, 500, {.forwards = false});
+
+
+	intake.move(127);
+	hook.move(-100);
+
+
+	chassis.moveToPoint(20, -41.5, 3000);
+	chassis.moveToPoint(20, -57, 3000);
+	chassis.moveToPoint(25, -57, 3000);
+	
+
+	// // Turn to 180 degrees and move forward to collect the ring
+	// chassis.moveToPoint(-24, -48, 1000);
+	// pros::delay(50);
+
+	// // Clamp the ring
+	// clamp.set_value(true);
+	// pros::delay(400);
+	// clamp.set_value(false);
+
+	// // Ram into the center
+	// chassis.moveToPoint(-24, 0, 1000);
+
+	// chassis.setPose(12, -60,-40);
+
+	// chassis.setPose(-12, -12,0); // Start position: 1 tile from right edge, facing backwards
+	// // Move the robot backwards 44 inches
+	// chassis.moveToPoint(-12, -44, 2000, {.forwards = false}); 
+	// // Move backwards to (-44, 0) maintaining 0 degree heading	
+
+	// // pros::delay(1000); // pause for 1 second before activating clamp
+	// clamp.set_value(true);
+	// pros::delay(1500); // Wait 200ms
+	// clamp.set_value(false);
 }
+// void autonomous()
+// {
+// 	// Set the initial pose of the robot (x, y, heading)
+// 	// chassis.setPose(-12, -12,-40); // Start position: 1 tile from right edge, facing backwards
+
+// 	// Moves the arm only
+// 	clamp.set_value(false);
+// 	arm.move(90);
+// 	pros::delay(1500);
+// 	arm.move(-90);
+// 	left_motors.move(-80);
+
+// 	// Turn to 270 and move backwards to (24, 0)
+// 	chassis.moveToPoint(-24,-24, 1000, {.forwards = false});
+// 	pros::delay(200);
+
+// 	// Clamp the mobile goal
+// 	clamp.set_value(true);
+// 	pros::delay(400);
+// 	clamp.set_value(false);
+
+// 	// Turn to 180 degrees and move forward to collect the ring
+// 	chassis.moveToPoint(-24, -48, 1000);
+// 	pros::delay(50);
+
+// 	// Clamp the ring
+// 	clamp.set_value(true);
+// 	pros::delay(400);
+// 	clamp.set_value(false);
+
+// 	// Ram into the center
+// 	chassis.moveToPoint(-24, 0, 1000);
+
+// 	// chassis.setPose(12, -60,-40);
+
+// 	// chassis.setPose(-12, -12,0); // Start position: 1 tile from right edge, facing backwards
+// 	// // Move the robot backwards 44 inches
+// 	// chassis.moveToPoint(-12, -44, 2000, {.forwards = false}); 
+// 	// // Move backwards to (-44, 0) maintaining 0 degree heading	
+
+// 	// // pros::delay(1000); // pause for 1 second before activating clamp
+// 	// clamp.set_value(true);
+// 	// pros::delay(1500); // Wait 200ms
+// 	// clamp.set_value(false);
+	
+	
+
+// }
+
+
+
+
 
 
 /**
@@ -205,8 +315,26 @@ pros::Controller controller(pros::E_CONTROLLER_MASTER);
 
 void opcontrol()
 {
+	// Store initial arm position
+	int initialArm = arm_encoder.get_value();
+
+	// PID variables for auto-arm control
+	const double Kp = 1.0, Ki = 0.0, Kd = 0.1;
+	static double pidIntegral = 0;
+	static double lastError = 0;
+	static double dt = 0.01; // 10ms for shaft encoder
+	static bool autoArmEnabled = false;
+	static bool autoArmLastY = false;
+	// New: persistent target for auto-arm mode
+	static int autoTargetArm = initialArm + 30;
+
+	int arm_initial = arm_encoder.get_value();
+
+	// scoreing positin: 110
+	//
 	while (true)
 	{
+		
 		// get left y and right x positions
         int leftY = controller.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y);
         int rightX = controller.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_X);
@@ -231,6 +359,8 @@ void opcontrol()
 			intake.move(0); // Stop if neither button is pressed
 		}
 
+		// // hook control with R1 (forward) and R2 (reverse)
+
 		// Auto-arm toggle using Y button
 		bool currentY = controller.get_digital(DIGITAL_Y);
 		if (currentY && !autoArmLastY)
@@ -243,20 +373,57 @@ void opcontrol()
 
 		int currentArm = arm_encoder.get_value();
 
-		pidIntegral = 0;
-		lastError = 0;
-		if (controller.get_digital(DIGITAL_L1))
+		// When auto-arm is enabled, use PID (adjust target faster with L buttons)
+		if (autoArmEnabled)
 		{
-			arm.move(60);
+			// Adjust the target if L1/L2 is pressed (faster adjustment)
+			if (controller.get_digital(DIGITAL_L1))
+				autoTargetArm += 3; // Increase target faster
+			if (controller.get_digital(DIGITAL_L2))
+				autoTargetArm -= 3; // Decrease target faster
+
+			// PID control to hold the arm at the autoTargetArm position
+			int error = autoTargetArm - currentArm;
+			pidIntegral += error * dt; // dt = 20ms for rotaitonal sensor, we are using 10ms for shaft encoder
+			int derivative = (error - lastError) / dt;
+			int pidOutput = static_cast<int>(Kp * error + Ki * pidIntegral + Kd * derivative);
+			lastError = error;
+			// Clamp output
+			if (pidOutput > 127)
+				pidOutput = 127;
+			if (pidOutput < -127)
+				pidOutput = -127;
+			arm.move(pidOutput);
 		}
-		else if (controller.get_digital(DIGITAL_L2))
+		else // When auto-arm is off, manual control is full (PID is bypassed)
 		{
-			arm.move(-60);
+			pidIntegral = 0;
+			lastError = 0;
+			if (controller.get_digital(DIGITAL_L1))
+			{
+				arm.move(60);
+			}
+			else if (controller.get_digital(DIGITAL_L2))
+			{
+				arm.move(-60);
+			}
+			else
+			{
+				arm.move(0);
+			}
 		}
-		else
+
+		// Single-action solenoid control for clamp
+		static bool clamp_state = false;
+		static bool clamp_last_a_state = false;
+		bool clamp_current_a_state = controller.get_digital(DIGITAL_A);
+
+		// Toggle state on button press (not hold)
+		if (clamp_current_a_state && !clamp_last_a_state)
 		{
-			arm.move(0);
+			clamp_state = !clamp_state;
 		}
+		clamp_last_a_state = clamp_current_a_state;
 
 		// Set solenoid based on toggled state
 		clamp.set_value(clamp_state);
