@@ -1,312 +1,231 @@
 #include "main.h"
 #include "lemlib/api.hpp"
+#include <cmath>
 
-// ======================= ASSETS / PATHS ===========================
-ASSET(path1_txt); // compiled path file from LemLib (test.txt)
-ASSET(path2_txt);
-ASSET(path3_txt);
-ASSET(path4_txt);
+// ======================= PATH.JERRYIO ASSET =======================
+// Keep this if you want; it will NOT affect driver.
+// ASSET(test_txt);
 
-// ======================= HARDWARE SETUP ===========================
+// ============================================================
+// PORTS
+// ============================================================
 
-// Drive motors (blue cartridges, 3.25" wheels)
-// Negative port on left_motors means reversed motor
-pros::MotorGroup right_motors({1, 2, -8}, pros::MotorGearset::blue);
-pros::MotorGroup left_motors({-3, -4, 7}, pros::MotorGearset::blue);
+// Drive motors
+pros::MotorGroup left_motors({-1, -2, -3}, pros::MotorGearset::blue);
+pros::MotorGroup right_motors({4, 8, 9}, pros::MotorGearset::blue);
 
-// Scoring motors (ports 6 and 7) – can spin both directions
-pros::MotorGroup scoring_motors({6, -7});
+// Intake / rollers
+pros::Motor roller_5(-5, pros::MotorGearset::blue);
+pros::Motor roller_6(6, pros::MotorGearset::blue);
+pros::Motor roller_7(7, pros::MotorGearset::blue);
 
-// Intake motor
-pros::Motor intake(5);
+// Pneumatics
+pros::ADIDigitalOut piston1('A');
+pros::ADIDigitalOut piston2('B');
 
-// Inertial sensor
-pros::Imu imu(10);
-
-// ==================== PNEUMATICS / PISTONS =========================
-// OPTION 1: pistons plugged directly into Brain 3-wire ports A and B:
-pros::adi::DigitalOut piston1('A'); // solenoid 1 -> piston 1
-pros::adi::DigitalOut piston2('B'); // solenoid 2 -> piston 2
-
-// OPTION 2 (if you use an ADI expander on smart port X):
-// pros::adi::DigitalOut piston1(X, 'A');
-// pros::adi::DigitalOut piston2(X, 'B');
-
-// Global states for pistons (so initialize() and opcontrol() match)
-bool piston1Extended = true; // piston1 starts retracted/closed
-bool piston2Extended = true; // piston2 starts extended/open (like you said)
+// START STATES (piston2 starts retracted)
+bool piston1Extended = false;
+bool piston2Extended = false;
 
 // Controller
 pros::Controller master(pros::E_CONTROLLER_MASTER);
 
-// ==================== AUTON PATH SELECTION ==========================
+// Rotation sensor for vertical tracking wheel (port 16)
+// If tracking counts backwards, flip sign.
+pros::Rotation vertRot(-16);
 
-enum class AutoPath { PATH1, PATH2, PATH3, PATH4 };
-AutoPath selectedPath = AutoPath::PATH1;
+// IMU (port 10)
+pros::Imu imu(12);
 
-// ==================== DRIVETRAIN / LEMLIB SETUP ===================
+// ============================================================
+// BASIC HELPERS
+// ============================================================
+static inline int clamp127(int v) {
+    if (v > 127) return 127;
+    if (v < -127) return -127;
+    return v;
+}
 
-// Drivetrain gearing: blue cart 600 RPM, 36T -> 60T external
+static inline int deadband(int v, int db = 6) {
+    return (std::abs(v) <= db) ? 0 : v;
+}
+
+static inline void setRollers56(int power) {
+    roller_5.move(power);
+    roller_6.move(power);
+}
+
+static inline void setRoller7(int power) {
+    roller_7.move(power);
+}
+
+// ============================================================
+// LEMLIB ODOM SETUP (1 vertical tracking wheel + IMU heading)
+// ============================================================
+
+constexpr auto TRACK_WHEEL_TYPE = lemlib::Omniwheel::NEW_2;
+constexpr float VERT_OFFSET_IN = 0.0; // <-- measure later
+
+lemlib::TrackingWheel verticalTrack(&vertRot, TRACK_WHEEL_TYPE, VERT_OFFSET_IN);
+
+lemlib::OdomSensors sensors(
+    &verticalTrack,
+    nullptr,
+    nullptr,
+    nullptr,
+    &imu
+);
+
+// Drivetrain
 const int MOTOR_TEETH = 36;
 const int WHEEL_TEETH = 60;
 const int MOTOR_CARTRIDGE_RPM_BLUE = 600;
-const int DRIVETRAIN_RPM =
-    MOTOR_CARTRIDGE_RPM_BLUE * MOTOR_TEETH / WHEEL_TEETH; // = 360 RPM
+const int DRIVETRAIN_RPM = MOTOR_CARTRIDGE_RPM_BLUE * MOTOR_TEETH / WHEEL_TEETH;
 
-// 3.25" drive wheels (2 omnis + 1 traction each side)
-lemlib::Drivetrain
-    drivetrain(&left_motors,  // left motor group
-               &right_motors, // right motor group
-               10,            // track width (inches, tune if needed)
-               lemlib::Omniwheel::NEW_325, // using 3.25" wheel model
-               DRIVETRAIN_RPM,             // computed rpm
-               2                           // lateral drift (tune later)
-    );
-
-// Odometry sensors – IMU ONLY, no tracking wheels right now
-lemlib::OdomSensors sensors(nullptr, // vertical tracking 1
-                            nullptr, // vertical tracking 2
-                            nullptr, // horizontal tracking 1
-                            nullptr, // horizontal tracking 2
-                            &imu     // inertial sensor
+lemlib::Drivetrain drivetrain(
+    &left_motors,
+    &right_motors,
+    12.625,
+    lemlib::Omniwheel::NEW_325,
+    DRIVETRAIN_RPM,
+    2
 );
 
-// Lateral PID
-lemlib::ControllerSettings lateral_controller(10,  // kP
-                                              0,   // kI
-                                              3,   // kD
-                                              3,   // anti-windup
-                                              1,   // small error (in)
-                                              100, // small error timeout (ms)
-                                              3,   // large error (in)
-                                              500, // large error timeout (ms)
-                                              20   // slew (max accel)
+// PID settings (starting values only)
+lemlib::ControllerSettings lateral_controller(
+    8, 0, 25,
+    3,
+    1, 100,
+    3, 500,
+    20
 );
 
-// Angular PID
-lemlib::ControllerSettings angular_controller(2,   // kP
-                                              0,   // kI
-                                              10,  // kD
-                                              3,   // anti-windup
-                                              1,   // small error (deg)
-                                              100, // small error timeout (ms)
-                                              3,   // large error (deg)
-                                              500, // large error timeout (ms)
-                                              0    // slew (0 = disabled)
+lemlib::ControllerSettings angular_controller(
+    2.2, 0, 12,
+    3,
+    1, 100,
+    3, 500,
+    0
 );
 
-// Chassis object
-lemlib::Chassis chassis(drivetrain, lateral_controller, angular_controller,
-                        sensors);
+lemlib::Chassis chassis(drivetrain, lateral_controller, angular_controller, sensors);
 
-// ======================= HELPER CONSTANTS =========================
-
-// Driver period + endgame reminder
-constexpr int DRIVER_PERIOD_MS = 105000;      // 1:45
-constexpr int ENDGAME_WARN_OFFSET_MS = 20000; // last 20 s
-constexpr int ENDGAME_WARN_MS = DRIVER_PERIOD_MS - ENDGAME_WARN_OFFSET_MS;
-
-// =========================== INITIALIZE ===========================
-
+// ============================================================
+// PROS DEFAULTS
+// ============================================================
 void initialize() {
-  pros::lcd::initialize();
-  pros::lcd::set_text(0, "8433X - PROS + LemLib (3.25\" drive)");
+    pros::lcd::initialize();
+    pros::lcd::set_text(0, "BOOTING...");
 
-  // Calibrate IMU + LemLib
-  chassis.calibrate();
+    left_motors.set_brake_mode(pros::E_MOTOR_BRAKE_BRAKE);
+    right_motors.set_brake_mode(pros::E_MOTOR_BRAKE_BRAKE);
 
-  // Brake modes
-  left_motors.set_brake_mode(pros::E_MOTOR_BRAKE_BRAKE);
-  right_motors.set_brake_mode(pros::E_MOTOR_BRAKE_BRAKE);
-  scoring_motors.set_brake_mode(pros::E_MOTOR_BRAKE_COAST);
-  intake.set_brake_mode(pros::E_MOTOR_BRAKE_COAST);
+    roller_5.set_brake_mode(pros::E_MOTOR_BRAKE_COAST);
+    roller_6.set_brake_mode(pros::E_MOTOR_BRAKE_COAST);
+    roller_7.set_brake_mode(pros::E_MOTOR_BRAKE_HOLD);
 
-  // Set pistons to known startup states
-  // piston1: retracted/closed (false)
-  // piston2: extended/open (true) – matches "always open until I retract"
-  piston1Extended = true;
-  piston2Extended = true;
-  piston1.set_value(piston1Extended);
-  piston2.set_value(piston2Extended);
+    piston1.set_value(piston1Extended);
+    piston2.set_value(piston2Extended);
 
-  // Screen task to show pose
-  pros::Task screen_task([] {
-    while (true) {
-      lemlib::Pose pose = chassis.getPose();
-      pros::lcd::print(0, "X: %.2f in", pose.x);
-      pros::lcd::print(1, "Y: %.2f in", pose.y);
-      pros::lcd::print(2, "Th: %.2f deg", pose.theta);
-      pros::delay(20);
+    // --------- SAFE IMU CALIBRATION (WITH TIMEOUT) ----------
+    pros::lcd::set_text(1, "IMU reset...");
+    imu.reset();
+
+    const int start = pros::millis();
+    while (imu.is_calibrating() && (pros::millis() - start) < 3000) {
+        pros::delay(20);
     }
-  });
+
+    if (imu.is_calibrating()) {
+        // IMU still calibrating (or not detected) -> DO NOT BLOCK
+        pros::lcd::set_text(1, "IMU FAIL/STALL -> driver OK");
+    } else {
+        pros::lcd::set_text(1, "IMU OK");
+        // LemLib calibrate can still take time; keep it short and safe:
+        // If this ever causes problems again, comment this line out.
+        chassis.calibrate();
+    }
+
+    pros::lcd::set_text(0, "READY");
 }
 
 void disabled() {}
-void competition_initialize() {
-  int index = 0; // 0..3
+void competition_initialize() {}
 
-  const char *names[4] = {"RED RIGHT", "BLUE RIGHT", "RED LEFT", "BLUE LEFT"};
-
-  while (true) {
-    // Display current selection on the brain screen
-    pros::lcd::print(3, "Select auton: %s  ", names[index]);
-    pros::lcd::print(4, "L/R change, A lock");
-
-    // Scroll left/right with dpad
-    if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_LEFT)) {
-      index = (index + 3) % 4; // wrap backwards
-    }
-    if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_RIGHT)) {
-      index = (index + 1) % 4; // wrap forwards
-    }
-
-    // Confirm with A
-    if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_A)) {
-      switch (index) {
-      case 0:
-        selectedPath = AutoPath::PATH1;
-        break;
-      case 1:
-        selectedPath = AutoPath::PATH2;
-        break;
-      case 2:
-        selectedPath = AutoPath::PATH3;
-        break;
-      case 3:
-        selectedPath = AutoPath::PATH4;
-        break;
-      }
-      pros::lcd::print(4, "Locked: %s         ", names[index]);
-      break;
-    }
-
-    pros::delay(20);
-  }
-}
-
-// ============================ AUTON ===============================
-
+// ============================================================
+// AUTON (WAYPOINTS)
+// ============================================================
 void autonomous() {
-  pros::lcd::print(3, "Auton running...");
-  // run intake for whole path
-  intake.move(127);
+    chassis.setPose(-47.171, 22.057, 90); // or 0  
+    
+    // Keep intake running upwards throughout auton
+    setRollers56(127);
+    setRoller7(127);
+    
+    // chassis.moveToPoint(0, 0, 5000);
+    // chassis.moveToPoint(0, 24.76, 5000);
+    // chassis.moveToPoint(-23.109, -18.629, 5000);
+    // chassis.moveToPoint(-23.109, 22.637, 5000);
+    // chassis.moveToPoint(-47.171, 22.057, 5000); //initial starting position
 
-  switch (selectedPath) {
-  case AutoPath::PATH1:
-    chassis.setPose(-137.219, -60.441, 90);
-    chassis.follow(path1_txt, 15, 14000);
-    break;
-  case AutoPath::PATH2:
-    chassis.setPose(138.585, 59.403, 270);
-    chassis.follow(path2_txt, 15, 14000);
-    break;
-  case AutoPath::PATH3:
-    chassis.setPose(-136.891, 58.746, 90);
-    chassis.follow(path3_txt, 15, 14000);
-    break;
-  case AutoPath::PATH4:
-    chassis.setPose(138.913, -59.456, 270);
-    chassis.follow(path4_txt, 15, 14000);
-    break;
-  }
+    chassis.moveToPoint(-22.647, 21.822, 5000);
+    chassis.turnToHeading(300, 5000);
+    chassis.moveToPoint(-60.612, 46.11, 5000);
+    chassis.turnToHeading(90, 5000);
+    chassis.moveToPoint(-23.118, 46.817, 5000);
 
-  // stop intake after path completes
-  intake.move(0);
 
-  pros::lcd::print(3, "Auton done.     ");
+    left_motors.move(0);
+    right_motors.move(0);
 }
 
-// ========================== DRIVER CONTROL ========================
-
+// ============================================================
+// DRIVER CONTROL
+// ============================================================
 void opcontrol() {
-  // Endgame rumble timing
-  const int startTime = pros::millis();
-  bool endgameRumbled = false;
+    bool lastA = false;
+    bool lastB = false;
 
-  // For button edge detection
-  bool lastA = false;
-  bool lastB = false;
+    while (true) {
+        int forward = deadband(master.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y));
+        int turn = deadband(master.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_X));
 
-  // Make sure drive motors are ready
-  left_motors.set_brake_mode(pros::E_MOTOR_BRAKE_BRAKE);
-  right_motors.set_brake_mode(pros::E_MOTOR_BRAKE_BRAKE);
+        int leftPower  = clamp127(forward + turn);
+        int rightPower = clamp127(forward - turn);
 
-  // Neutral actuators
-  intake.move(0);
-  scoring_motors.move(0);
+        left_motors.move(leftPower);
+        right_motors.move(rightPower);
 
-  pros::lcd::print(3, "Driver control...");
+        bool r2 = master.get_digital(pros::E_CONTROLLER_DIGITAL_R2);
+        bool l2 = master.get_digital(pros::E_CONTROLLER_DIGITAL_L2);
+        bool r1 = master.get_digital(pros::E_CONTROLLER_DIGITAL_R1);
 
-  while (true) {
-    // ================== DRIVING (RAW ARCADE) ==================
-    // Left stick Y = forward/back  (we negate so up = forward)
-    // Right stick X = turn left/right
-    int forward = -master.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y);
-    int turn = master.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_X);
+        if (r2 && !l2) setRollers56(127);
+        else if (l2 && !r2) setRollers56(-127);
+        else setRollers56(0);
 
-    // Arcade mix
-    int leftPower = forward + turn;
-    int rightPower = forward - turn;
+        if (r1) setRoller7(-127);
+        else if (r2 && !l2) setRoller7(127);
+        else if (l2 && !r2) setRoller7(-127);
+        else setRoller7(0);
 
-    // Clamp to [-127, 127] just to be safe
-    if (leftPower > 127)
-      leftPower = 127;
-    if (leftPower < -127)
-      leftPower = -127;
-    if (rightPower > 127)
-      rightPower = 127;
-    if (rightPower < -127)
-      rightPower = -127;
+        bool currA = master.get_digital(pros::E_CONTROLLER_DIGITAL_A);
+        if (currA && !lastA) {
+            piston1Extended = !piston1Extended;
+            piston1.set_value(piston1Extended);
+        }
+        lastA = currA;
 
-    // Directly command the motor groups (no LemLib here)
-    left_motors.move(leftPower);
-    right_motors.move(rightPower);
+        bool currB = master.get_digital(pros::E_CONTROLLER_DIGITAL_B);
+        if (currB && !lastB) {
+            piston2Extended = !piston2Extended;
+            piston2.set_value(piston2Extended);
+        }
+        lastB = currB;
 
-    // ================== INTAKE ==================
-    // L1 = intake in, L2 = intake out
-    if (master.get_digital(pros::E_CONTROLLER_DIGITAL_L1)) {
-      intake.move(127);
-    } else if (master.get_digital(pros::E_CONTROLLER_DIGITAL_L2)) {
-      intake.move(-127);
-    } else {
-      intake.move(0);
+        pros::lcd::print(2, "LY:%d RX:%d", forward, turn);
+        pros::lcd::print(3, "IMU cal:%d", (int)imu.is_calibrating());
+
+        pros::delay(20);
     }
-
-    // ================== SCORING MOTORS (PORT 6) ==================
-    // R1 = scoring forward, R2 = scoring reverse
-    if (master.get_digital(pros::E_CONTROLLER_DIGITAL_R1)) {
-      scoring_motors.move(127);
-    } else if (master.get_digital(pros::E_CONTROLLER_DIGITAL_R2)) {
-      scoring_motors.move(-127);
-    } else {
-      scoring_motors.move(0);
-    }
-
-    // ================== PISTON 1 (PORT A) – button A ==================
-    bool currA = master.get_digital(pros::E_CONTROLLER_DIGITAL_A);
-    if (currA && !lastA) { // rising edge
-      piston1Extended = !piston1Extended;
-      piston1.set_value(piston1Extended);
-      master.rumble("."); // small haptic feedback
-    }
-    lastA = currA;
-
-    // ================== PISTON 2 (PORT B) – button B ==================
-    bool currB = master.get_digital(pros::E_CONTROLLER_DIGITAL_B);
-    if (currB && !lastB) { // rising edge
-      piston2Extended = !piston2Extended;
-      piston2.set_value(piston2Extended);
-      master.rumble("."); // small haptic feedback
-    }
-    lastB = currB;
-
-    // ================== ENDGAME REMINDER ==================
-    int elapsed = pros::millis() - startTime;
-    if (!endgameRumbled && elapsed >= ENDGAME_WARN_MS) {
-      master.rumble(".."); // quick double rumble near endgame
-      endgameRumbled = true;
-    }
-
-    pros::delay(20);
-  }
-}
+} 
