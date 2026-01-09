@@ -12,7 +12,7 @@
 
 // Drive motors
 pros::MotorGroup left_motors({-1, -2, -3}, pros::MotorGearset::blue);
-pros::MotorGroup right_motors({4, 8, 9}, pros::MotorGearset::blue);
+pros::MotorGroup right_motors({4, 8, 20}, pros::MotorGearset::blue);
 
 // Intake / rollers
 pros::Motor roller_5(-5, pros::MotorGearset::blue);
@@ -20,8 +20,19 @@ pros::Motor roller_6(6, pros::MotorGearset::blue);
 pros::Motor roller_7(7, pros::MotorGearset::blue);
 
 // Pneumatics
-pros::ADIDigitalOut piston1('A');
-pros::ADIDigitalOut piston2('B');
+pros::adi::DigitalOut piston1('A');    
+pros::adi::DigitalOut piston2('B');
+
+constexpr bool REV_LEFT_DRIVE  = false;
+constexpr bool REV_RIGHT_DRIVE = false;
+
+
+
+
+constexpr bool REV_ROLLER_5 = false;
+constexpr bool REV_ROLLER_6 = false;
+constexpr bool REV_ROLLER_7 = false;
+
 
 // START STATES (piston2 starts retracted)
 bool piston1Extended = false;
@@ -30,9 +41,9 @@ bool piston2Extended = false;
 // Controller
 pros::Controller master(pros::E_CONTROLLER_MASTER);
 
-// Rotation sensor for vertical tracking wheel (port 16)
+// Rotation sensor for vertical tracking wheel (port 11)
 // If tracking counts backwards, flip sign.
-pros::Rotation vertRot(-16);
+pros::Rotation vertRot(-11);
 
 // IMU (port 10)
 pros::Imu imu(12);
@@ -44,6 +55,11 @@ static inline int clamp127(int v) {
     if (v > 127) return 127;
     if (v < -127) return -127;
     return v;
+}
+
+
+static inline int maybeRev(int power, bool rev) {
+    return rev ? -power : power;
 }
 
 static inline int deadband(int v, int db = 6) {
@@ -64,7 +80,7 @@ static inline void setRoller7(int power) {
 // ============================================================
 
 constexpr auto TRACK_WHEEL_TYPE = lemlib::Omniwheel::NEW_2;
-constexpr float VERT_OFFSET_IN = 0.0; // <-- measure later
+constexpr float VERT_OFFSET_IN = -1.125; // <-- measure later
 
 lemlib::TrackingWheel verticalTrack(&vertRot, TRACK_WHEEL_TYPE, VERT_OFFSET_IN);
 
@@ -87,25 +103,29 @@ lemlib::Drivetrain drivetrain(
     &right_motors,
     12.625,
     lemlib::Omniwheel::NEW_325,
-    DRIVETRAIN_RPM,
+    360,
     2
 );
-
-// PID settings (starting values only)
-lemlib::ControllerSettings lateral_controller(
-    8, 0, 25,
-    3,
-    1, 100,
-    3, 500,
-    20
+lemlib::ControllerSettings lateral_controller(10, // proportional gain (kP)
+                                              0, // integral gain (kI)
+                                              3, // derivative gain (kD)
+                                              3, // anti windup
+                                              1, // small error range, in inches
+                                              100, // small error range timeout, in milliseconds
+                                              3, // large error range, in inches
+                                              500, // large error range timeout, in milliseconds
+                                              10 // maximum acceleration (slew)
 );
 
-lemlib::ControllerSettings angular_controller(
-    2.2, 0, 12,
-    3,
-    1, 100,
-    3, 500,
-    0
+lemlib::ControllerSettings angular_controller(2, // proportional gain (kP)
+                                              0, // integral gain (kI)
+                                              10, // derivative gain (kD)
+                                              3, // anti windup
+                                              1, // small error range, in degrees
+                                              100, // small error range timeout, in milliseconds
+                                              3, // large error range, in degrees
+                                              500, // large error range timeout, in milliseconds
+                                              0 // maximum acceleration (slew)
 );
 
 lemlib::Chassis chassis(drivetrain, lateral_controller, angular_controller, sensors);
@@ -113,40 +133,33 @@ lemlib::Chassis chassis(drivetrain, lateral_controller, angular_controller, sens
 // ============================================================
 // PROS DEFAULTS
 // ============================================================
+// initialize function. Runs on program startup
 void initialize() {
-    pros::lcd::initialize();
-    pros::lcd::set_text(0, "BOOTING...");
+    pros::lcd::initialize(); // initialize brain screen
+    
+    // Reset and initialize the rotation sensor
+    vertRot.reset_position();
+    
+    chassis.calibrate(); // calibrate sensors
+    // print position to brain screen
+    pros::Task screen_task([&]() {
+        while (true) {
+            // print robot location to the brain screen
+            pros::lcd::print(0, "X: %f", chassis.getPose().x); // x
+            pros::lcd::print(1, "Y: %f", chassis.getPose().y); // y
+            pros::lcd::print(2, "Theta: %f", chassis.getPose().theta); // heading
 
-    left_motors.set_brake_mode(pros::E_MOTOR_BRAKE_BRAKE);
-    right_motors.set_brake_mode(pros::E_MOTOR_BRAKE_BRAKE);
+            // delay to save resources
+            std::cout << "x: " << chassis.getPose().x << std::endl;
+            std::cout << "y: " << chassis.getPose().y << std::endl;
+            std::cout << "theta: " << chassis.getPose().theta << std::endl;
+            std::cout << "RotSensor Pos: " << vertRot.get_position() << std::endl;
+            std::cout << "RotSensor Installed: " << vertRot.is_installed() << std::endl;
+            std::cout << "IMU Heading: " << imu.get_heading() << std::endl;
 
-    roller_5.set_brake_mode(pros::E_MOTOR_BRAKE_COAST);
-    roller_6.set_brake_mode(pros::E_MOTOR_BRAKE_COAST);
-    roller_7.set_brake_mode(pros::E_MOTOR_BRAKE_HOLD);
-
-    piston1.set_value(piston1Extended);
-    piston2.set_value(piston2Extended);
-
-    // --------- SAFE IMU CALIBRATION (WITH TIMEOUT) ----------
-    pros::lcd::set_text(1, "IMU reset...");
-    imu.reset();
-
-    const int start = pros::millis();
-    while (imu.is_calibrating() && (pros::millis() - start) < 3000) {
-        pros::delay(20);
-    }
-
-    if (imu.is_calibrating()) {
-        // IMU still calibrating (or not detected) -> DO NOT BLOCK
-        pros::lcd::set_text(1, "IMU FAIL/STALL -> driver OK");
-    } else {
-        pros::lcd::set_text(1, "IMU OK");
-        // LemLib calibrate can still take time; keep it short and safe:
-        // If this ever causes problems again, comment this line out.
-        chassis.calibrate();
-    }
-
-    pros::lcd::set_text(0, "READY");
+            pros::delay(1000); // increased from 20ms to avoid LVGL rendering conflicts
+        }
+    });
 }
 
 void disabled() {}
@@ -156,11 +169,13 @@ void competition_initialize() {}
 // AUTON (WAYPOINTS)
 // ============================================================
 void autonomous() {
-    chassis.setPose(-47.171, 22.057, 90); // or 0  
+    chassis.setPose(0, 0, 0); // or 0  
+    // turn to face heading 90 with a very long timeout
+    chassis.turnToHeading(90, 100000);
     
     // Keep intake running upwards throughout auton
-    setRollers56(127);
-    setRoller7(127);
+    // setRollers56(127);
+    // setRoller7(127);
     
     // chassis.moveToPoint(0, 0, 5000);
     // chassis.moveToPoint(0, 24.76, 5000);
@@ -168,47 +183,108 @@ void autonomous() {
     // chassis.moveToPoint(-23.109, 22.637, 5000);
     // chassis.moveToPoint(-47.171, 22.057, 5000); //initial starting position
 
-    chassis.moveToPoint(-22.647, 21.822, 5000);
-    chassis.turnToHeading(300, 5000);
-    chassis.moveToPoint(-60.612, 46.11, 5000);
-    chassis.turnToHeading(90, 5000);
-    chassis.moveToPoint(-23.118, 46.817, 5000);
+    // chassis.moveToPoint(-22.647, 21.822, 5000);
+    // chassis.turnToHeading(300, 5000;
+    // chassis.moveToPoint(-60.612, 46.11, 5000);
+    // chassis.turnToHeading(90, 5000);
+    // chassis.moveToPoint(-23.118, 46.817, 5000);
 
 
-    left_motors.move(0);
-    right_motors.move(0);
+    // left_motors.move(0);
+    // right_motors.move(0);
+
+    //eddie code
+    // chassis.setPose(-47.407, -22.392, 90);
+    // chassis.moveToPoint(-22.175, -22.628, 5000);
+    // chassis.moveToPoint(-68.393, -46.916, 5000);
+    // chassis.moveToPoint(-24.769, -47.152, 5000);
+
+    //madhav
+    //chassis.moveToPoint(-66.035, -0.462, 1000);
+    // chassis.moveToPoint(-57.546, -0.462, 1000);
+    // chassis.moveToPoint(-23.59, 25.241, 1000);
+    // chassis.moveToPoint(-10.385, 10.621, 1000);
+    // chassis.moveToPoint(-46.935, 46.935, 5000);
+    // chassis.moveToPoint(-66.978, 46.463, 5000);
+    // chassis.moveToPoint(-27.835, 63.677, 5000);
+    // chassis.moveToPoint(41.492, 63.441, 5000);
+    // chassis.moveToPoint(41.964, 47.407, 5000);
+    // chassis.moveToPoint(29.231, 46.699, 5000);
+    // chassis.moveToPoint(66.488, 47.642, 5000);
+    // chassis.moveToPoint(28.287, 45.992, 5000);
+
 }
 
 // ============================================================
 // DRIVER CONTROL
 // ============================================================
+
+pros::Controller controller(pros::E_CONTROLLER_MASTER);
+
 void opcontrol() {
     bool lastA = false;
     bool lastB = false;
 
+
+
+
     while (true) {
-        int forward = deadband(master.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y));
-        int turn = deadband(master.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_X));
+        // ---------------- DRIVE (ARCADE) ----------------
+        int forward = master.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y);
+        int turn    = master.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_X);
+
+
+
 
         int leftPower  = clamp127(forward + turn);
         int rightPower = clamp127(forward - turn);
 
-        left_motors.move(leftPower);
-        right_motors.move(rightPower);
 
+
+
+        left_motors.move(maybeRev(leftPower, REV_LEFT_DRIVE));
+        right_motors.move(maybeRev(rightPower, REV_RIGHT_DRIVE));
+
+
+
+
+        // ---------------- MANUAL ROLLERS 5/6 (R2 forward, L2 reverse) ----------------
         bool r2 = master.get_digital(pros::E_CONTROLLER_DIGITAL_R2);
         bool l2 = master.get_digital(pros::E_CONTROLLER_DIGITAL_L2);
+
+
+
+
+        int power56 = 0;
+        if (r2 && !l2) power56 = 127;
+        else if (l2 && !r2) power56 = -127;
+        setRollers56(power56);
+
+
+
+
+        // ---------------- MOTOR 7 ----------------
         bool r1 = master.get_digital(pros::E_CONTROLLER_DIGITAL_R1);
 
-        if (r2 && !l2) setRollers56(127);
-        else if (l2 && !r2) setRollers56(-127);
-        else setRollers56(0);
 
-        if (r1) setRoller7(-127);
-        else if (r2 && !l2) setRoller7(127);
-        else if (l2 && !r2) setRoller7(-127);
-        else setRoller7(0);
 
+
+        int power7 = 0;
+        if (r1) {
+            power7 = 127;
+        } else if (r2 && !l2) {
+            power7 = 127;
+        } else if (l2 && !r2) {
+            power7 = -127;
+        } else {
+            power7 = 0;
+        }
+        setRoller7(power7);
+
+
+
+
+        // ---------------- PISTONS (toggle) ----------------
         bool currA = master.get_digital(pros::E_CONTROLLER_DIGITAL_A);
         if (currA && !lastA) {
             piston1Extended = !piston1Extended;
@@ -216,16 +292,20 @@ void opcontrol() {
         }
         lastA = currA;
 
+
+
+
         bool currB = master.get_digital(pros::E_CONTROLLER_DIGITAL_B);
-        if (currB && !lastB) {
+        if (currB && !lastB) {                 // ✅ toggle on press
             piston2Extended = !piston2Extended;
             piston2.set_value(piston2Extended);
         }
         lastB = currB;
 
-        pros::lcd::print(2, "LY:%d RX:%d", forward, turn);
-        pros::lcd::print(3, "IMU cal:%d", (int)imu.is_calibrating());
+
+
 
         pros::delay(20);
     }
-} 
+}
+
