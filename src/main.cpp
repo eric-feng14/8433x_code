@@ -2,6 +2,8 @@
 #include "lemlib/api.hpp"
 #include <cmath>
 
+using namespace std;
+
 // ======================= PATH.JERRYIO ASSET =======================
 // Keep this if you want; it will NOT affect driver.
 // ASSET(test_txt);
@@ -21,7 +23,7 @@ pros::Motor roller_7(7, pros::MotorGearset::blue);
 
 // Pneumatics
 pros::adi::DigitalOut piston1('A');    
-pros::adi::DigitalOut piston2('B');
+pros::adi::DigitalOut piston2('H');
 
 constexpr bool REV_LEFT_DRIVE  = false;
 constexpr bool REV_RIGHT_DRIVE = false;
@@ -43,7 +45,7 @@ pros::Controller master(pros::E_CONTROLLER_MASTER);
 
 // Rotation sensor for vertical tracking wheel (port 11)
 // If tracking counts backwards, flip sign.
-pros::Rotation vertRot(-11);
+pros::Rotation vertRot(11);
 
 // IMU (port 10)
 pros::Imu imu(12);
@@ -82,7 +84,7 @@ static inline void setRoller7(int power) {
 constexpr auto TRACK_WHEEL_TYPE = lemlib::Omniwheel::NEW_2;
 constexpr float VERT_OFFSET_IN = -1.125; // <-- measure later
 
-lemlib::TrackingWheel verticalTrack(&vertRot, TRACK_WHEEL_TYPE, VERT_OFFSET_IN);
+lemlib::TrackingWheel verticalTrack(&vertRot, TRACK_WHEEL_TYPE, 0);
 
 lemlib::OdomSensors sensors(
     &verticalTrack,
@@ -103,7 +105,7 @@ lemlib::Drivetrain drivetrain(
     &right_motors,
     12.625,
     lemlib::Omniwheel::NEW_325,
-    360,
+    DRIVETRAIN_RPM,
     2
 );
 lemlib::ControllerSettings lateral_controller(10, // proportional gain (kP)
@@ -134,30 +136,21 @@ lemlib::Chassis chassis(drivetrain, lateral_controller, angular_controller, sens
 // PROS DEFAULTS
 // ============================================================
 // initialize function. Runs on program startup
+// initialize function. Runs on program startup
 void initialize() {
     pros::lcd::initialize(); // initialize brain screen
-    
-    // Reset and initialize the rotation sensor
-    vertRot.reset_position();
-    
     chassis.calibrate(); // calibrate sensors
     // print position to brain screen
     pros::Task screen_task([&]() {
         while (true) {
             // print robot location to the brain screen
-            pros::lcd::print(0, "X: %f", chassis.getPose().x); // x
+            pros::lcd::print(0, "Xxxx: %f", chassis.getPose().x); // x
             pros::lcd::print(1, "Y: %f", chassis.getPose().y); // y
             pros::lcd::print(2, "Theta: %f", chassis.getPose().theta); // heading
-
+            
+            cout << "X: " << chassis.getPose().x << " Y: " << chassis.getPose().y << " Theta: " << chassis.getPose().theta << endl;
             // delay to save resources
-            std::cout << "x: " << chassis.getPose().x << std::endl;
-            std::cout << "y: " << chassis.getPose().y << std::endl;
-            std::cout << "theta: " << chassis.getPose().theta << std::endl;
-            std::cout << "RotSensor Pos: " << vertRot.get_position() << std::endl;
-            std::cout << "RotSensor Installed: " << vertRot.is_installed() << std::endl;
-            std::cout << "IMU Heading: " << imu.get_heading() << std::endl;
-
-            pros::delay(1000); // increased from 20ms to avoid LVGL rendering conflicts
+            pros::delay(100);
         }
     });
 }
@@ -169,9 +162,23 @@ void competition_initialize() {}
 // AUTON (WAYPOINTS)
 // ============================================================
 void autonomous() {
-    chassis.setPose(0, 0, 0); // or 0  
+
+    chassis.setPose(0, 0, 0);
     // turn to face heading 90 with a very long timeout
-    chassis.turnToHeading(90, 100000);
+    // intake.telOP(true, false, false, false); // intake
+    // queue balls (intake)
+    chassis.moveToPose(9, 26, 24, 2000);
+    chassis.turnToHeading(114, 1000);
+    chassis.moveToPoint(34.73, 6, 2000);
+    chassis.turnToHeading(180, 2000);
+    chassis.moveToPose(34.73, -20, 180, 1500, {.maxSpeed = 150});
+    chassis.moveToPose(36.73, 25, 180, 2000, {.forwards = false});
+    pros::delay(2000);
+
+
+    // chassis.setPose(0, 0, 0); // or 0  
+    // chassis.moveToPoint(0, 48, 100000); // turn to face heading 90 with a very long timeout
+
     
     // Keep intake running upwards throughout auton
     // setRollers56(127);
