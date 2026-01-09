@@ -1,6 +1,8 @@
 #include "main.h"
 #include "lemlib/api.hpp"
 #include <cmath>
+#include "SubSystems/intake.hpp"
+
 
 using namespace std;
 
@@ -21,14 +23,21 @@ pros::Motor roller_5(-5, pros::MotorGearset::blue);
 pros::Motor roller_6(6, pros::MotorGearset::blue);
 pros::Motor roller_7(7, pros::MotorGearset::blue);
 
+/*
+roller_5 -> left
+roller_6 -> right
+piston1 -> bot
+piston2 -> top
+*/
+
 // Pneumatics
 pros::adi::DigitalOut piston1('A');    
 pros::adi::DigitalOut piston2('H');
 
+Intake intake(roller_5, roller_6, piston1, piston2);
+
 constexpr bool REV_LEFT_DRIVE  = false;
 constexpr bool REV_RIGHT_DRIVE = false;
-
-
 
 
 constexpr bool REV_ROLLER_5 = false;
@@ -76,6 +85,8 @@ static inline void setRollers56(int power) {
 static inline void setRoller7(int power) {
     roller_7.move(power);
 }
+
+
 
 // ============================================================
 // LEMLIB ODOM SETUP (1 vertical tracking wheel + IMU heading)
@@ -144,11 +155,11 @@ void initialize() {
     pros::Task screen_task([&]() {
         while (true) {
             // print robot location to the brain screen
-            pros::lcd::print(0, "Xxxx: %f", chassis.getPose().x); // x
-            pros::lcd::print(1, "Y: %f", chassis.getPose().y); // y
-            pros::lcd::print(2, "Theta: %f", chassis.getPose().theta); // heading
+            // pros::lcd::print(0, "Xxxx: %f", chassis.getPose().x); // x
+            // pros::lcd::print(1, "Y: %f", chassis.getPose().y); // y
+            // pros::lcd::print(2, "Theta: %f", chassis.getPose().theta); // heading
             
-            cout << "X: " << chassis.getPose().x << " Y: " << chassis.getPose().y << " Theta: " << chassis.getPose().theta << endl;
+            // cout << "X: " << chassis.getPose().x << " Y: " << chassis.getPose().y << " Theta: " << chassis.getPose().theta << endl;
             // delay to save resources
             pros::delay(100);
         }
@@ -158,14 +169,10 @@ void initialize() {
 void disabled() {}
 void competition_initialize() {}
 
-// ============================================================
-// AUTON (WAYPOINTS)
-// ============================================================
-void autonomous() {
-
+void rightSideAuton() {
     chassis.setPose(0, 0, 0);
     // turn to face heading 90 with a very long timeout
-    // intake.telOP(true, false, false, false); // intake
+    intake.telOP(true, false, false, false); // intake
     // queue balls (intake)
     chassis.moveToPose(9, 26, 24, 2000);
     chassis.turnToHeading(114, 1000);
@@ -173,8 +180,115 @@ void autonomous() {
     chassis.turnToHeading(180, 2000);
     chassis.moveToPose(34.73, -20, 180, 1500, {.maxSpeed = 150});
     chassis.moveToPose(36.73, 25, 180, 2000, {.forwards = false});
-    pros::delay(2000);
+    pros::delay(1000);
+    intake.telOP(false, true, false, false); // outtake
+}
 
+void leftSideAuton() {
+  chassis.setPose(0, 0, 0);
+
+  intake.telOP(true, false, false, false);
+  chassis.moveToPose(-8.6, 37, -21, 2000, {.minSpeed = 50}, false);
+  pros::delay(300);
+  chassis.turnToHeading(-131, 1000); // fix
+  chassis.moveToPose(7, 44, -131, 1300, {.forwards = false});
+  pros::delay(1300);
+  intake.telOP(false, false, true, false);
+  pros::delay(400);
+  intake.telOP(true, false, false, false);
+  pros::delay(200);
+  chassis.moveToPoint(-34.73, 8, 2000);
+  chassis.turnToHeading(180, 1000);
+  chassis.moveToPoint(-36, -20, 1600, {.maxSpeed = 40});
+  chassis.moveToPoint(-35.5, 30, 1000, {.forwards = false, .maxSpeed = 80},
+                      false);
+  intake.telOP(false, true, false, false);
+  pros::delay(2000);
+  chassis.moveToPoint(-35.5, 17, 1000, {.minSpeed = 60}, false);
+  chassis.moveToPoint(-35.5, 40, 1000, {.forwards = false, .minSpeed = 200},
+                      false);
+}
+
+void long_goal_score(bool active) {
+  if (active) {
+    intake.telOP(false, true, false, false);
+  } else {
+    intake.telOP(false, false, false, false);
+  }
+}
+
+void middle_goal_score(bool active) {
+  if (active) {
+    intake.telOP(false, false, true, false);
+  } else {
+    intake.telOP(false, false, false, false);
+  }
+}
+
+void matchload_activate(bool active) {
+  if (active) {
+    intake.telOP(true, false, false, false);
+  } else {
+    intake.telOP(false, false, false, false);
+  }
+}
+
+void skills() {
+  chassis.setPose(0, 0, 0);
+  
+  // Point 1: move forward
+  chassis.moveToPoint(-0.08, 22.48, 3000);
+  
+  // Point 2: turn in place
+  chassis.turnToHeading(-103.22, 1500);
+  
+  // Point 3: move
+  chassis.moveToPoint(-25.80, 16.09, 3000);
+  
+  // Point 4: turn in place
+  chassis.turnToHeading(-186.07, 1500);
+  
+  // Point 5: move
+  chassis.moveToPoint(-23.79, -8.58, 3000);
+  
+  // Point 6: turn in place
+  chassis.turnToHeading(-83.48, 1500);
+  
+  // Point 7: move
+  chassis.moveToPoint(-51.63, -7.29, 3000);
+  
+  // Point 8: move
+  chassis.moveToPoint(-76.47, -9.37, 3000);
+  
+  // Point 9: move
+  chassis.moveToPoint(-89.25, -6.79, 3000);
+  
+  // Point 10: move
+  chassis.moveToPoint(-104.23, 13.31, 4000);
+  
+  // Point 11: turn in place
+  chassis.turnToHeading(7.97, 1500);
+  
+  // Point 12: move
+  chassis.moveToPoint(-102.34, 28.36, 2000);
+  
+  // Point 13: move
+  chassis.moveToPoint(-100.12, -4.18, 3000);
+  
+  // Point 14: move
+  chassis.moveToPoint(-100.55, 16.77, 3000);
+  
+  // Point 15: move
+  chassis.moveToPoint(-59.07, 35.15, 4000);
+}
+
+
+// ============================================================
+// AUTON (WAYPOINTS)
+// ============================================================
+void autonomous() {
+
+    skills();
 
     // chassis.setPose(0, 0, 0); // or 0  
     // chassis.moveToPoint(0, 48, 100000); // turn to face heading 90 with a very long timeout
@@ -273,7 +387,7 @@ void opcontrol() {
         // ---------------- MOTOR 7 ----------------
         bool r1 = master.get_digital(pros::E_CONTROLLER_DIGITAL_R1);
 
-
+        //r1, l2 run at same time at center
 
 
         int power7 = 0;
@@ -313,6 +427,10 @@ void opcontrol() {
 
 
         pros::delay(20);
+        
+        if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_X)) {
+            cout << "[X PRESSED] X: " << chassis.getPose().x << " Y: " << chassis.getPose().y << " Theta: " << chassis.getPose().theta << endl;
+        }
     }
 }
 
