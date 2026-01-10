@@ -2,6 +2,7 @@
 #include "lemlib/api.hpp"
 #include <cmath>
 #include "SubSystems/intake.hpp"
+#include "pros/motors.hpp"
 
 
 using namespace std;
@@ -34,7 +35,7 @@ piston2 -> top
 pros::adi::DigitalOut piston1('A');    
 pros::adi::DigitalOut piston2('H');
 
-Intake intake(roller_5, roller_6, piston1, piston2);
+Intake intake(roller_5, roller_6, roller_7);
 
 constexpr bool REV_LEFT_DRIVE  = false;
 constexpr bool REV_RIGHT_DRIVE = false;
@@ -187,23 +188,37 @@ void rightSideAuton() {
 void leftSideAuton() {
   chassis.setPose(0, 0, 0);
 
+  //keep piston a, "the wing" activated
+  piston1.set_value(true);
+
   intake.telOP(true, false, false, false);
   chassis.moveToPose(-8.6, 37, -21, 2000, {.minSpeed = 50}, false);
   pros::delay(300);
   chassis.turnToHeading(-131, 1000); // fix
-  chassis.moveToPose(7, 44, -131, 1300, {.forwards = false});
+  chassis.moveToPose(7, 44, -131, 1500, {.forwards = false});
+  roller_7.move(5);
   pros::delay(1300);
+
+  // Activate piston H for middle goal match load and score
   intake.telOP(false, false, true, false);
   pros::delay(400);
-  intake.telOP(true, false, false, false);
-  pros::delay(200);
+
+  // intake.telOP(true, false, false, false);
+  pros::delay(2000);
   chassis.moveToPoint(-34.73, 8, 2000);
-  chassis.turnToHeading(180, 1000);
-  chassis.moveToPoint(-36, -20, 1600, {.maxSpeed = 40});
-  chassis.moveToPoint(-35.5, 30, 1000, {.forwards = false, .maxSpeed = 80},
+  chassis.turnToHeading(180, 2000);
+  piston2.set_value(true);
+  chassis.moveToPoint(-36, -20, 2000, {.maxSpeed = 40});
+  chassis.moveToPoint(-35.5, 30, 2000, {.forwards = false, .maxSpeed = 80},
                       false);
+  piston2.set_value(false);
+
+  // Activate piston H for long goal match load and score
+  piston2.set_value(true);
   intake.telOP(false, true, false, false);
   pros::delay(2000);
+  piston2.set_value(false);
+
   chassis.moveToPoint(-35.5, 17, 1000, {.minSpeed = 60}, false);
   chassis.moveToPoint(-35.5, 40, 1000, {.forwards = false, .minSpeed = 200},
                       false);
@@ -288,7 +303,8 @@ void skills() {
 // ============================================================
 void autonomous() {
 
-    skills();
+    // skills();
+    leftSideAuton();
 
     // chassis.setPose(0, 0, 0); // or 0  
     // chassis.moveToPoint(0, 48, 100000); // turn to face heading 90 with a very long timeout
