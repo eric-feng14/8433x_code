@@ -4,13 +4,11 @@
 
 class Intake {
 public:
-  Intake(pros::Motor LEFT, pros::Motor RIGHT, pros::adi::DigitalOut BOT,
-         pros::adi::DigitalOut TOP);
+  Intake(pros::Motor& roller_5, pros::Motor& roller_6, pros::Motor& roller_7);
   void telOP(bool intake, bool scoreTop, bool scoreMid, bool outtake);
 
 private:
-  pros::Motor left;
-  pros::Motor right;
-  pros::adi::DigitalOut bot;
-  pros::adi::DigitalOut top;
+  pros::Motor& left;   // roller_5
+  pros::Motor& right;  // roller_6
+  pros::Motor& center; // roller_7
 };
