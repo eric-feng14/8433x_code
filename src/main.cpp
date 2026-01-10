@@ -359,53 +359,34 @@ void autonomous() {
 pros::Controller controller(pros::E_CONTROLLER_MASTER);
 
 void opcontrol() {
-    bool lastA = false;
-    bool lastB = false;
-
-
-
+    // State variables for pistons (if not defined globally)
+    static bool piston1Extended = false;
+    static bool piston2Extended = false;
 
     while (true) {
-        // ---------------- DRIVE (ARCADE) ----------------
+        // 1. DRIVE CONTROL (Arcade Drive)
+        // Using Left Y for forward/backward and Right X for turning
         int forward = master.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y);
         int turn    = master.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_X);
-
-
-
 
         int leftPower  = clamp127(forward + turn);
         int rightPower = clamp127(forward - turn);
 
-
-
-
         left_motors.move(maybeRev(leftPower, REV_LEFT_DRIVE));
         right_motors.move(maybeRev(rightPower, REV_RIGHT_DRIVE));
 
-
-
-
-        // ---------------- MANUAL ROLLERS 5/6 (R2 forward, L2 reverse) ----------------
+        // 2. ROLLER CONTROL (Motors 5, 6, and 7)
+        bool r1 = master.get_digital(pros::E_CONTROLLER_DIGITAL_R1);
         bool r2 = master.get_digital(pros::E_CONTROLLER_DIGITAL_R2);
         bool l2 = master.get_digital(pros::E_CONTROLLER_DIGITAL_L2);
 
-
-
-
+        // Logic for Rollers 5 & 6
         int power56 = 0;
-        if (r2 && !l2) power56 = 127;
-        else if (l2 && !r2) power56 = -127;
+        if (r2 && !l2) power56 = 127;  // Forward
+        else if (!r2 && l2) power56 = -127; // Reverse        
         setRollers56(power56);
 
-
-
-
-        // ---------------- MOTOR 7 ----------------
-        bool r1 = master.get_digital(pros::E_CONTROLLER_DIGITAL_R1);
-
-        //r1, l2 run at same time at center
-
-
+        // Logic for Roller 7 (Prioritizes R1, then follows R2/L2)
         int power7 = 0;
         if (r1) {
             power7 = 127;
@@ -418,35 +399,29 @@ void opcontrol() {
         }
         setRoller7(power7);
 
-
-
-
-        // ---------------- PISTONS (toggle) ----------------
-        bool currA = master.get_digital(pros::E_CONTROLLER_DIGITAL_A);
-        if (currA && !lastA) {
+        // 3. PISTON CONTROL (Toggles)
+        // .get_digital_new_press() returns true only on the initial press, 
+        // removing the need for 'lastA' or 'lastB' variables.
+        if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_A)) {
             piston1Extended = !piston1Extended;
             piston1.set_value(piston1Extended);
         }
-        lastA = currA;
 
-
-
-
-        bool currB = master.get_digital(pros::E_CONTROLLER_DIGITAL_B);
-        if (currB && !lastB) {                 // ✅ toggle on press
+        if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_B)) {
             piston2Extended = !piston2Extended;
             piston2.set_value(piston2Extended);
         }
-        lastB = currB;
 
-
-
-
-        pros::delay(20);
-        
+        // 4. TELEMETRY / DEBUGGING
         if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_X)) {
-            cout << "[X PRESSED] X: " << chassis.getPose().x << " Y: " << chassis.getPose().y << " Theta: " << chassis.getPose().theta << endl;
+            auto pose = chassis.getPose();
+            std::cout << "[DEBUG] X: " << pose.x 
+                      << " Y: " << pose.y 
+                      << " Theta: " << pose.theta << std::endl;
         }
+
+        // Loop delay to prevent CPU hogging (50Hz)
+        pros::delay(20);
     }
 }
 
