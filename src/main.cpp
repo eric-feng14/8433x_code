@@ -17,7 +17,7 @@ using namespace std;
 
 // Drive motors
 pros::MotorGroup left_motors({-1, -2, -3}, pros::MotorGearset::blue);
-pros::MotorGroup right_motors({4, 8, 20}, pros::MotorGearset::blue);
+pros::MotorGroup right_motors({4, 8, 9}, pros::MotorGearset::blue);
 
 // Intake / rollers
 pros::Motor roller_5(-5, pros::MotorGearset::blue);
@@ -55,10 +55,10 @@ pros::Controller master(pros::E_CONTROLLER_MASTER);
 
 // Rotation sensor for vertical tracking wheel (port 11)
 // If tracking counts backwards, flip sign.
-pros::Rotation vertRot(11);
+pros::Rotation vertRot(10);
 
 // IMU (port 10)
-pros::Imu imu(12);
+pros::Imu imu(20);
 
 // ============================================================
 // BASIC HELPERS
@@ -224,6 +224,31 @@ void leftSideAuton() {
                       false);
 }
 
+void leftside() {
+  chassis.setPose(0, 0, 0);
+
+  intake.telOP(true, false, false, false);
+  chassis.moveToPose(-8.6, 37, -21, 2000, {.minSpeed = 50}, false);
+  pros::delay(300);
+  chassis.turnToHeading(-131, 1000); // fix
+  chassis.moveToPose(7, 44, -131, 1300, {.forwards = false});
+  pros::delay(1300);
+  intake.telOP(false, false, true, false);
+  pros::delay(400);
+  intake.telOP(true, false, false, false);
+  pros::delay(200);
+  chassis.moveToPoint(-34.73, 8, 2000);
+  chassis.turnToHeading(180, 1000);
+  chassis.moveToPoint(-36, -20, 1600, {.maxSpeed = 40});
+  chassis.moveToPoint(-35.5, 30, 1000, {.forwards = false, .maxSpeed = 80},
+                      false);
+  intake.telOP(false, true, false, false);
+  pros::delay(2000);
+  chassis.moveToPoint(-35.5, 17, 1000, {.minSpeed = 60}, false);
+  chassis.moveToPoint(-35.5, 40, 1000, {.forwards = false, .minSpeed = 200},
+                      false);
+}
+
 void long_goal_score(bool active) {
   if (active) {
     intake.telOP(false, true, false, false);
@@ -304,7 +329,8 @@ void skills() {
 void autonomous() {
 
     // skills();
-    leftSideAuton();
+    // leftSideAuton();
+    leftside();
 
     // chassis.setPose(0, 0, 0); // or 0  
     // chassis.moveToPoint(0, 48, 100000); // turn to face heading 90 with a very long timeout
