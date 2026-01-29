@@ -1,7 +1,7 @@
 #include "main.h"
 #include "lemlib/api.hpp"
 #include <cmath>
-#include "SubSystems/intake.hpp"
+#include "SubSystems/Intake.hpp"
 #include "pros/motors.hpp"
 
 
