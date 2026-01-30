@@ -272,52 +272,7 @@ void matchload_activate(bool active) {
 }
 
 void skills() {
-  chassis.setPose(0, 0, 0);
-    
-  // Point 1: move forward
-  chassis.moveToPoint(-0.08, 22.48, 3000);
-  
-  // Point 2: turn in place
-  chassis.turnToHeading(-103.22, 1500);
-  
-  // Point 3: move
-  chassis.moveToPoint(-25.80, 16.09, 3000);
-  
-  // Point 4: turn in place
-  chassis.turnToHeading(-186.07, 1500);
-  
-  // Point 5: move
-  chassis.moveToPoint(-23.79, -8.58, 3000);
-  
-  // Point 6: turn in place
-  chassis.turnToHeading(-83.48, 1500);
-  
-  // Point 7: move
-  chassis.moveToPoint(-51.63, -7.29, 3000);
-  
-  // Point 8: move
-  chassis.moveToPoint(-76.47, -9.37, 3000);
-  
-  // Point 9: move
-  chassis.moveToPoint(-89.25, -6.79, 3000);
-  
-  // Point 10: move
-  chassis.moveToPoint(-104.23, 13.31, 4000);
-  
-  // Point 11: turn in place
-  chassis.turnToHeading(7.97, 1500);
-  
-  // Point 12: move
-  chassis.moveToPoint(-102.34, 28.36, 2000);
-  
-  // Point 13: move
-  chassis.moveToPoint(-100.12, -4.18, 3000);
-  
-  // Point 14: move
-  chassis.moveToPoint(-100.55, 16.77, 3000);
-  
-  // Point 15: move
-  chassis.moveToPoint(-59.07, 35.15, 4000);
+    leftSideAuton();
 }
 
 void tuningTest() {
@@ -341,51 +296,6 @@ void autonomous() {
     // leftSideAuton();
     // leftside();
     tuningTest();
-
-
-    // chassis.setPose(0, 0, 0); // or 0  
-    // chassis.moveToPoint(0, 48, 100000); // turn to face heading 90 with a very long timeout
-
-    
-    // Keep intake running upwards throughout auton
-    // setRollers56(127);
-    // setRoller7(127);
-    
-    // chassis.moveToPoint(0, 0, 5000);
-    // chassis.moveToPoint(0, 24.76, 5000);
-    // chassis.moveToPoint(-23.109, -18.629, 5000);
-    // chassis.moveToPoint(-23.109, 22.637, 5000);
-    // chassis.moveToPoint(-47.171, 22.057, 5000); //initial starting position
-
-    // chassis.moveToPoint(-22.647, 21.822, 5000);
-    // chassis.turnToHeading(300, 5000;
-    // chassis.moveToPoint(-60.612, 46.11, 5000);
-    // chassis.turnToHeading(90, 5000);
-    // chassis.moveToPoint(-23.118, 46.817, 5000);
-
-
-    // left_motors.move(0);
-    // right_motors.move(0);
-
-    //eddie code
-    // chassis.setPose(-47.407, -22.392, 90);
-    // chassis.moveToPoint(-22.175, -22.628, 5000);
-    // chassis.moveToPoint(-68.393, -46.916, 5000);
-    // chassis.moveToPoint(-24.769, -47.152, 5000);
-
-    //madhav
-    //chassis.moveToPoint(-66.035, -0.462, 1000);
-    // chassis.moveToPoint(-57.546, -0.462, 1000);
-    // chassis.moveToPoint(-23.59, 25.241, 1000);
-    // chassis.moveToPoint(-10.385, 10.621, 1000);
-    // chassis.moveToPoint(-46.935, 46.935, 5000);
-    // chassis.moveToPoint(-66.978, 46.463, 5000);
-    // chassis.moveToPoint(-27.835, 63.677, 5000);
-    // chassis.moveToPoint(41.492, 63.441, 5000);
-    // chassis.moveToPoint(41.964, 47.407, 5000);
-    // chassis.moveToPoint(29.231, 46.699, 5000);
-    // chassis.moveToPoint(66.488, 47.642, 5000);
-    // chassis.moveToPoint(28.287, 45.992, 5000);
 
 }
 
@@ -418,6 +328,8 @@ void opcontrol() {
         bool l2 = master.get_digital(pros::E_CONTROLLER_DIGITAL_L2);
         bool left_arrow = master.get_digital(pros::E_CONTROLLER_DIGITAL_LEFT);
 
+        intake.update(r1,r2,l2,left_arrow);
+        /*
         // Check for mid score (left arrow)
         if (left_arrow) {
             setRollers56(-127);  // Reverse
@@ -442,6 +354,7 @@ void opcontrol() {
             }
             setRoller7(power7);
         }
+        */
 
         // 3. PISTON CONTROL (Toggles)
         // .get_digital_new_press() returns true only on the initial press, 
