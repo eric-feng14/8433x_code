@@ -2,7 +2,9 @@
 #include "lemlib/api.hpp"
 #include <cmath>
 #include "SubSystems/intake.hpp"
+#include "lemlib/chassis/trackingWheel.hpp"
 #include "pros/motors.hpp"
+#include "pros/rtos.hpp"
 
 
 using namespace std;
@@ -32,8 +34,8 @@ piston2 -> top
 */
 
 // Pneumatics
-pros::adi::DigitalOut piston1('A');    
-pros::adi::DigitalOut piston2('H');
+pros::adi::DigitalOut piston1('A'); //wing
+pros::adi::DigitalOut piston2('B'); //matchloader
 
 Intake intake(roller_5, roller_6, roller_7);
 
@@ -120,9 +122,9 @@ lemlib::Drivetrain drivetrain(
     DRIVETRAIN_RPM,
     2
 );
-lemlib::ControllerSettings lateral_controller(10, // proportional gain (kP)
+lemlib::ControllerSettings lateral_controller(7.5, // proportional gain (kP)
                                               0, // integral gain (kI)
-                                              3, // derivative gain (kD)
+                                              15, // derivative gain (kD)
                                               3, // anti windup
                                               1, // small error range, in inches
                                               100, // small error range timeout, in milliseconds
@@ -131,14 +133,14 @@ lemlib::ControllerSettings lateral_controller(10, // proportional gain (kP)
                                               10 // maximum acceleration (slew)
 );
 
-lemlib::ControllerSettings angular_controller(2, // proportional gain (kP)
-                                              0, // integral gain (kI)
+lemlib::ControllerSettings angular_controller(1, // proportional gain (kP)
+                                              2, // integral gain (kI)
                                               10, // derivative gain (kD)
-                                              3, // anti windup
-                                              1, // small error range, in degrees
-                                              100, // small error range timeout, in milliseconds
-                                              3, // large error range, in degrees
-                                              500, // large error range timeout, in milliseconds
+                                              10, // anti windup
+                                              0,// small error range, in degrees
+                                              0, // small error range timeout, in milliseconds
+                                              0, // large error range, in degrees
+                                              0, // large error range timeout, in milliseconds
                                               0 // maximum acceleration (slew)
 );
 
@@ -186,67 +188,63 @@ void rightSideAuton() {
 }
 
 void leftSideAuton() {
-  chassis.setPose(0, 0, 0);
+    chassis.setPose(0, 0, 0);
+    intake.telOP(true, false, false, false);
 
-  //keep piston a, "the wing" activated
-  piston1.set_value(true);
+    chassis.moveToPoint(-13.60, 47.6518, 3000, {.maxSpeed = 40});
+    pros::delay(1000);
+    intake.telOP(false, false, false, false); // turn off intake
 
-  intake.telOP(true, false, false, false);
-  chassis.moveToPose(-8.6, 37, -21, 2000, {.minSpeed = 50}, false);
-  pros::delay(300);
-  chassis.turnToHeading(-131, 1000); // fix
-  chassis.moveToPose(7, 44, -131, 1500, {.forwards = false});
-  roller_7.move(5);
-  pros::delay(1300);
+    chassis.moveToPose(5.20893, 55.1891,-130, 3000, {.forwards = false, .maxSpeed = 40});
+    intake.telOP(false, false, true, false);
+    pros::delay(1500);
 
-  // Activate piston H for middle goal match load and score
-  intake.telOP(false, false, true, false);
-  pros::delay(400);
+    chassis.moveToPoint(-30.3277, 10.443, 3000, {.maxSpeed = 40});
+    chassis.turnToHeading(180, 2000);
+    chassis.moveToPoint(-30.6277, -2.36389, 3000, {.maxSpeed = 40});
+    intake.telOP(true, false, false, false);
+    // piston1.set_value(true);
+    // piston2.set_value(true);
 
-  // intake.telOP(true, false, false, false);
-  pros::delay(2000);
-  chassis.moveToPoint(-34.73, 8, 2000);
-  chassis.turnToHeading(180, 2000);
-  piston2.set_value(true);
-  chassis.moveToPoint(-36, -20, 2000, {.maxSpeed = 40});
-  chassis.moveToPoint(-35.5, 30, 2000, {.forwards = false, .maxSpeed = 80},
-                      false);
-  piston2.set_value(false);
-
-  // Activate piston H for long goal match load and score
-  piston2.set_value(true);
-  intake.telOP(false, true, false, false);
-  pros::delay(2000);
-  piston2.set_value(false);
-
-  chassis.moveToPoint(-35.5, 17, 1000, {.minSpeed = 60}, false);
-  chassis.moveToPoint(-35.5, 40, 1000, {.forwards = false, .minSpeed = 200},
-                      false);
+    chassis.moveToPoint(-30.687, 48.551, 3000, {.forwards = false, .maxSpeed = 40});
+    intake.telOP(false, true, false, false);
 }
 
+//arjun's code modified -> eddie has the original
 void leftside() {
   chassis.setPose(0, 0, 0);
 
+  //turn intake on
   intake.telOP(true, false, false, false);
   chassis.moveToPose(-8.6, 37, -21, 2000, {.minSpeed = 50}, false);
   pros::delay(300);
+
+  //score mid goal
   chassis.turnToHeading(-131, 1000); // fix
-  chassis.moveToPose(7, 44, -131, 1300, {.forwards = false});
+  chassis.moveToPose(9, 44, -131, 1300, {.forwards = false});
+
+  //score
   pros::delay(1300);
   intake.telOP(false, false, true, false);
   pros::delay(400);
   intake.telOP(true, false, false, false);
   pros::delay(200);
-  chassis.moveToPoint(-34.73, 8, 2000);
-  chassis.turnToHeading(180, 1000);
-  chassis.moveToPoint(-36, -20, 1600, {.maxSpeed = 40});
-  chassis.moveToPoint(-35.5, 30, 1000, {.forwards = false, .maxSpeed = 80},
+
+  //move to matchload
+  chassis.moveToPoint(-30, 8, 2000, {.maxSpeed = 40});
+  chassis.turnToHeading(180, 2000);
+
+  //perform matchload
+  chassis.moveToPoint(-30, 0, 1600, {.maxSpeed = 40});
+  chassis.moveToPoint(-30, 30, 1000, {.forwards = false, .maxSpeed = 80},
                       false);
   intake.telOP(false, true, false, false);
   pros::delay(2000);
-  chassis.moveToPoint(-35.5, 17, 1000, {.minSpeed = 60}, false);
-  chassis.moveToPoint(-35.5, 40, 1000, {.forwards = false, .minSpeed = 200},
-                      false);
+
+  //ram it again?
+//   chassis.moveToPoint(-30, 17, 1000, {.minSpeed = 60}, false);
+//   chassis.moveToPoint(-30, 40, 1000, {.forwards = false, .maxSpeed = 80},
+//                       false);
 }
 
 void long_goal_score(bool active) {
@@ -275,7 +273,7 @@ void matchload_activate(bool active) {
 
 void skills() {
   chassis.setPose(0, 0, 0);
-  
+    
   // Point 1: move forward
   chassis.moveToPoint(-0.08, 22.48, 3000);
   
@@ -322,6 +320,17 @@ void skills() {
   chassis.moveToPoint(-59.07, 35.15, 4000);
 }
 
+void tuningTest() {
+    chassis.setPose(0, 0, 0);
+    // chassis.moveToPoint(0, 48, 3000, {.maxSpeed=40}); // turn to face heading 90 with a very long timeout
+    chassis.turnToHeading(90, 4000);
+    // chassis.moveToPoint(0, 48, 4000);
+    pros::delay(4500);
+     auto pose = chassis.getPose();
+            std::cout << "[DEBUG] X: " << pose.x 
+                      << " Y: " << pose.y 
+                      << " Theta: " << pose.theta << std::endl;
+}
 
 // ============================================================
 // AUTON (WAYPOINTS)
@@ -330,7 +339,9 @@ void autonomous() {
 
     // skills();
     // leftSideAuton();
-    leftside();
+    // leftside();
+    tuningTest();
+
 
     // chassis.setPose(0, 0, 0); // or 0  
     // chassis.moveToPoint(0, 48, 100000); // turn to face heading 90 with a very long timeout
@@ -405,25 +416,32 @@ void opcontrol() {
         bool r1 = master.get_digital(pros::E_CONTROLLER_DIGITAL_R1);
         bool r2 = master.get_digital(pros::E_CONTROLLER_DIGITAL_R2);
         bool l2 = master.get_digital(pros::E_CONTROLLER_DIGITAL_L2);
+        bool left_arrow = master.get_digital(pros::E_CONTROLLER_DIGITAL_LEFT);
 
-        // Logic for Rollers 5 & 6
-        int power56 = 0;
-        if (r2 && !l2) power56 = 127;  // Forward
-        else if (!r2 && l2) power56 = -127; // Reverse        
-        setRollers56(power56);
-
-        // Logic for Roller 7 (Prioritizes R1, then follows R2/L2)
-        int power7 = 0;
-        if (r1) {
-            power7 = 127;
-        } else if (r2 && !l2) {
-            power7 = 127;
-        } else if (l2 && !r2) {
-            power7 = -127;
+        // Check for mid score (left arrow)
+        if (left_arrow) {
+            setRollers56(-127);  // Reverse
+            setRoller7(127);     // Forward
         } else {
-            power7 = 0;
+            // Logic for Rollers 5 & 6
+            int power56 = 0;
+            if (r2 && !l2) power56 = 127;  // Forward
+            else if (!r2 && l2) power56 = -127; // Reverse        
+            setRollers56(power56);
+
+            // Logic for Roller 7 (Prioritizes R1, then follows R2/L2)
+            int power7 = 0;
+            if (r1) {
+                power7 = 127;
+            } else if (r2 && !l2) {
+                power7 = 127;
+            } else if (l2 && !r2) {
+                power7 = -127;
+            } else {
+                power7 = 0;
+            }
+            setRoller7(power7);
         }
-        setRoller7(power7);
 
         // 3. PISTON CONTROL (Toggles)
         // .get_digital_new_press() returns true only on the initial press, 
