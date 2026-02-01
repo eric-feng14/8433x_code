@@ -5,7 +5,7 @@
 class Intake {
 public:
   Intake(pros::Motor& roller_5, pros::Motor& roller_6, pros::Motor& roller_7);
-  void telOP(bool intake, bool scoreTop, bool scoreMid, bool outtake);
+  void telOP(bool intake, bool scoreTop, bool scoreMid, bool descore);
 
 private:
   pros::Motor& left;   // roller_5
