@@ -298,65 +298,116 @@ void leftSideAuton() { // eric
     chassis.moveToPoint(-30.687, 48.551, 3000, {.forwards = false, .maxSpeed = 40});
     intake.telOP(false, true, false, false);
 }
-// ============================================================
-// AUTON (WAYPOINTS)
-// ============================================================
 
+//arjun's code modified -> eddie has the original
+void leftside() {
+  chassis.setPose(0, 0, 0);
 
+  //turn intake on
+  intake.telOP(true, false, false, false);
+  chassis.moveToPose(-8.6, 37, -21, 2000, {.minSpeed = 50}, false);
+  pros::delay(300);
 
-// void KennyAuton(){
-//     chassis.setPose(0, 0, 0);
-//     // doinker.set_value(true);
-//     // piston3.set_value(false);
-//     piston2.set_value(false); // wing piston out
-//     intake.telOP(true, false, false, false); // keep intake on
-//     chassis.moveToPose(-1.5, 30.3, -11.4, 2000, {.minSpeed = 50}, false);
-//     pros::delay(300);
-//     chassis.turnToHeading(-135, 1000);
-//     chassis.moveToPose(-1.5, 55.8, -135, 3000, {.forwards=false, .minSpeed = 60}, false);
-//     // intake.telOP(false, false, true, false, false, false);
-//     intake.telOP(false, false, true, false); // score mid
+  //score mid goal
+  chassis.turnToHeading(-131, 1000); // fix
+  chassis.moveToPose(9, 44, -131, 1300, {.forwards = false});
 
-//     pros::delay(1200);
-//     // intake.telOP(true, false, false, false, false, false);
-//     intake.telOP(true, false, false, false); // intake
+  //score
+  pros::delay(1300);
+  intake.telOP(false, false, true, false);
+  pros::delay(400);
+  intake.telOP(true, false, false, false);
+  pros::delay(200);
 
-//     pros::delay(200);
-//     chassis.moveToPoint(-30.8, 11.3, 2000);
-//     pros::delay(200);
-//     chassis.turnToHeading(180, 1000);
-//     // tongue.set_value(true);
-//     piston3.set_value(true); // matchloader piston out
+  //move to matchload
+  chassis.moveToPoint(-30, 8, 2000, {.maxSpeed = 40});
+  chassis.turnToHeading(180, 2000);
 
-//     piston3.set_value(true); //
-//     piston1.set_value(true); //hopefully its the hood
-//     chassis.moveToPoint(-27.3, -3.9, 1700, {.maxSpeed = 40});
-//     chassis.moveToPoint(-35.8, 26.9, 1000, {.forwards=false, .maxSpeed = 80}, false);
-//     // intake.telOP(false, true, false, false, false, false); // bro wth does this do
-//     intake.telOP(false, true, false, false); // score top long
+  //perform matchload
+  chassis.moveToPoint(-30, 0, 1600, {.maxSpeed = 40});
+  chassis.moveToPoint(-30, 30, 1000, {.forwards = false, .maxSpeed = 80},
+                      false);
+  intake.telOP(false, true, false, false);
+  pros::delay(2000);
 
-//     pros::delay(2000);
-//     // tongue.set_value(false);
-//     // piston3.set_value(true); // matchloader piston in
-
-//     chassis.moveToPoint(-30.9, 11.6, 1000, {.minSpeed = 60}, false);
-//     chassis.turnToHeading(70, 1000);
-//     chassis.moveToPoint(-18.3, 18.2, 1000, {.forwards = false});
-//     chassis.turnToHeading(150, 1000);
-//     // doinker.set_value(false);
-//     piston1.set_value(false); // wing piston in
-
-//     chassis.moveToPoint(-36.1, 43.7, 3000, {.forwards=false, .maxSpeed = 60}, false);
-// }
-
-void intakeTest() {
-  intake.telOP(false, false, true, false); //score mid testing
+  //ram it again?
+//   chassis.moveToPoint(-30, 17, 1000, {.minSpeed = 60}, false);
+//   chassis.moveToPoint(-30, 40, 1000, {.forwards = false, .maxSpeed = 80},
+//                       false);
 }
 
-// void skills() {
-//   KennyAuton();
+void long_goal_score(bool active) {
+  if (active) {
+    intake.telOP(false, true, false, false);
+  } else {
+    intake.telOP(false, false, false, false);
+  }
+}
+
+void middle_goal_score(bool active) {
+  if (active) {
+    intake.telOP(false, false, true, false);
+  } else {
+    intake.telOP(false, false, false, false);
+  }
+}
+
+void matchload_activate(bool active) {
+  if (active) {
+    intake.telOP(true, false, false, false);
+  } else {
+    intake.telOP(false, false, false, false);
+  }
+}
+
+void skills() {
+  chassis.setPose(0, 0, 0);
+    
+  // Point 1: move forward
+  chassis.moveToPoint(-0.08, 22.48, 3000);
   
-// }
+  // Point 2: turn in place
+  chassis.turnToHeading(-103.22, 1500);
+  
+  // Point 3: move
+  chassis.moveToPoint(-25.80, 16.09, 3000);
+  
+  // Point 4: turn in place
+  chassis.turnToHeading(-186.07, 1500);
+  
+  // Point 5: move
+  chassis.moveToPoint(-23.79, -8.58, 3000);
+  
+  // Point 6: turn in place
+  chassis.turnToHeading(-83.48, 1500);
+  
+  // Point 7: move
+  chassis.moveToPoint(-51.63, -7.29, 3000);
+  
+  // Point 8: move
+  chassis.moveToPoint(-76.47, -9.37, 3000);
+  
+  // Point 9: move
+  chassis.moveToPoint(-89.25, -6.79, 3000);
+  
+  // Point 10: move
+  chassis.moveToPoint(-104.23, 13.31, 4000);
+  
+  // Point 11: turn in place
+  chassis.turnToHeading(7.97, 1500);
+  
+  // Point 12: move
+  chassis.moveToPoint(-102.34, 28.36, 2000);
+  
+  // Point 13: move
+  chassis.moveToPoint(-100.12, -4.18, 3000);
+  
+  // Point 14: move
+  chassis.moveToPoint(-100.55, 16.77, 3000);
+  
+  // Point 15: move
+  chassis.moveToPoint(-59.07, 35.15, 4000);
+}
 
 void oldKennyAuton() {
     chassis.setPose(0, 0, 0);
@@ -408,53 +459,53 @@ void oldKennyAuton() {
 
 void autonomous() {
     // leftSideAuton();
-    // oldKennyAuton();
+    // leftside();
+    tuningTest();
+
+
+    // chassis.setPose(0, 0, 0); // or 0  
+    // chassis.moveToPoint(0, 48, 100000); // turn to face heading 90 with a very long timeout
+
     
-    chassis.setPose(0, 0, 0);
-    // doinker.set_value(true);
-    // piston3.set_value(false);
-    piston2.set_value(false); // wing piston out
-    intake.telOP(true, false, false, false); // keep intake on
-    chassis.moveToPose( -12, 37, -21, 2000, {.minSpeed = 40}, false);
-    pros::delay(300);
-    chassis.turnToHeading(-131, 1000); // fix
-    chassis.moveToPose(7, 44, -131, 1600,{.forwards=false, .minSpeed = 60}, false);
-    // intake.telOP(false, false, true, false, false, false);
-    intake.telOP(false, false, true, false); // score mid
-
-    pros::delay(400);
-    // intake.telOP(true, false, false, false, false, false);
-    intake.telOP(true, false, false, false); // intake
-
-    pros::delay(200);
-    chassis.moveToPoint(-30, 8, 2000);
-    pros::delay(200);
-    chassis.turnToHeading(180, 1000);
-    // tongue.set_value(true);
-    piston3.set_value(true); // matchloader piston out
-
-    piston3.set_value(true); //
-    piston1.set_value(true); //hopefully its the hood
-    chassis.moveToPoint(-30, -20, 1700, {.maxSpeed = 40});
-    chassis.moveToPoint(-30, 30, 1000, {.forwards=false,.maxSpeed = 80}, false);
-    // intake.telOP(false, true, false, false, false, false); // bro wth does this do
-    intake.telOP(false, true, false, false); // score top long
-
-    pros::delay(2000);
-    // tongue.set_value(false);
-    // piston3.set_value(true); // matchloader piston in
-
-    // chassis.moveToPoint(-34, 17, 1000, {.minSpeed = 60}, false);
-    // chassis.turnToHeading(130, 1000);
-    // chassis.moveToPoint(-44, 22, 1000, {.forwards = false});
-    // chassis.turnToHeading(180, 1000);
-    // doinker.set_value(false);
-//     piston1.set_value(false); // wing piston in
-
-//     chassis.moveToPoint(-44, 45, 3000, {.forwards=false, .maxSpeed = 60}, false);
+    // Keep intake running upwards throughout auton
+    // setRollers56(127);
+    // setRoller7(127);
     
-    // intakeTest();
-    // tuningtest();
+    // chassis.moveToPoint(0, 0, 5000);
+    // chassis.moveToPoint(0, 24.76, 5000);
+    // chassis.moveToPoint(-23.109, -18.629, 5000);
+    // chassis.moveToPoint(-23.109, 22.637, 5000);
+    // chassis.moveToPoint(-47.171, 22.057, 5000); //initial starting position
+
+    // chassis.moveToPoint(-22.647, 21.822, 5000);
+    // chassis.turnToHeading(300, 5000;
+    // chassis.moveToPoint(-60.612, 46.11, 5000);
+    // chassis.turnToHeading(90, 5000);
+    // chassis.moveToPoint(-23.118, 46.817, 5000);
+
+
+    // left_motors.move(0);
+    // right_motors.move(0);
+
+    //eddie code
+    // chassis.setPose(-47.407, -22.392, 90);
+    // chassis.moveToPoint(-22.175, -22.628, 5000);
+    // chassis.moveToPoint(-68.393, -46.916, 5000);
+    // chassis.moveToPoint(-24.769, -47.152, 5000);
+
+    //madhav
+    //chassis.moveToPoint(-66.035, -0.462, 1000);
+    // chassis.moveToPoint(-57.546, -0.462, 1000);
+    // chassis.moveToPoint(-23.59, 25.241, 1000);
+    // chassis.moveToPoint(-10.385, 10.621, 1000);
+    // chassis.moveToPoint(-46.935, 46.935, 5000);
+    // chassis.moveToPoint(-66.978, 46.463, 5000);
+    // chassis.moveToPoint(-27.835, 63.677, 5000);
+    // chassis.moveToPoint(41.492, 63.441, 5000);
+    // chassis.moveToPoint(41.964, 47.407, 5000);
+    // chassis.moveToPoint(29.231, 46.699, 5000);
+    // chassis.moveToPoint(66.488, 47.642, 5000);
+    // chassis.moveToPoint(28.287, 45.992, 5000);
 
 }
 
@@ -480,32 +531,22 @@ void opcontrol() {
         right_motors.move(maybeRev(rightPower, REV_RIGHT_DRIVE));
 
         // 2. ROLLER CONTROL (Motors 5, 6, and 7)
-        bool scoreMidBtn = master.get_digital(pros::E_CONTROLLER_DIGITAL_X);      // X: score middle goal
-        bool intakeBtn = master.get_digital(pros::E_CONTROLLER_DIGITAL_L1);       // L1: stack/intake
-        bool scoreTopBtn = master.get_digital(pros::E_CONTROLLER_DIGITAL_L2);     // L2: score top goal + hood
-        bool descoreBtn = master.get_digital(pros::E_CONTROLLER_DIGITAL_R1);      // R1: descore from matchload
+        bool r1 = master.get_digital(pros::E_CONTROLLER_DIGITAL_R1);
+        bool r2 = master.get_digital(pros::E_CONTROLLER_DIGITAL_R2);
+        bool l2 = master.get_digital(pros::E_CONTROLLER_DIGITAL_L2);
+        bool left_arrow = master.get_digital(pros::E_CONTROLLER_DIGITAL_LEFT);
 
-        if (scoreMidBtn) {
-          // Score middle goal
-          setRoller5(127);
-          setRoller6(127);
-          setRoller7(127);
-        } else if (intakeBtn || scoreTopBtn) {
-          // L1: stack/intake, L2: score top goal (activates hood)
-          setRoller5(127);
-          setRoller6(127);
-          setRoller7(-127);
-        } else if (descoreBtn) {
-          // Descore everything from matchload
-          setRoller5(-127);
-          setRoller6(-127);
-          setRoller7(127);
+        // Check for mid score (left arrow)
+        if (left_arrow) {
+            setRollers56(-127);  // Reverse
+            setRoller7(127);     // Forward
         } else {
           // Stop all rollers
           setRoller5(0);
           setRoller6(0);
           setRoller7(0);
         }
+        */
 
         // 3. PISTON CONTROL (Toggles)
         // .get_digital_new_press() returns true only on the initial press, 

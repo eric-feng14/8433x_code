@@ -11,4 +11,6 @@ private:
   pros::Motor& left;   // roller_5
   pros::Motor& right;  // roller_6
   pros::Motor& center; // roller_7
+  
+  static constexpr int FULL_POWER = 127;
 };
