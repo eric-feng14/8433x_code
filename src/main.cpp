@@ -24,13 +24,6 @@ pros::Motor roller_5(-5, pros::MotorGearset::blue);
 pros::Motor roller_6(6, pros::MotorGearset::blue);
 pros::Motor roller_7(7, pros::MotorGearset::blue);
 
-/*driver
-roller_5 -> left
-roller_6 -> right
-piston1 -> bot
-piston2 -> top
-*/
-
 // Pneumatics
 pros::adi::DigitalOut piston1('A'); //hood 
 pros::adi::DigitalOut piston2('B'); //wing
@@ -42,7 +35,6 @@ Intake intake(roller_5, roller_6, roller_7);
 constexpr bool REV_LEFT_DRIVE  = false;
 constexpr bool REV_RIGHT_DRIVE = false;
 
-
 constexpr bool REV_ROLLER_5 = true;
 constexpr bool REV_ROLLER_6 = true;
 constexpr bool REV_ROLLER_7 = false;
@@ -51,6 +43,7 @@ constexpr bool REV_ROLLER_7 = false;
 // START STATES (piston2 starts retracted)
 bool piston1Extended = false;
 bool piston2Extended = false;
+bool piston3Extended = false;
 
 // Controller
 pros::Controller master(pros::E_CONTROLLER_MASTER);
@@ -183,24 +176,8 @@ void initialize() {
 void disabled() {}
 void competition_initialize() {}
 
-// Other autonomous routines disabled — using only `autonomous()` below
-#if 0
-void rightSideAuton() {
-    chassis.setPose(0, 0, 0);
-    // turn to face heading 90 with a very long timeout
-    intake.telOP(true, false, false, false); // intake
-    // queue balls (intake)
-    chassis.moveToPose(9, 26, 24, 2000);
-    chassis.turnToHeading(114, 1000);
-    chassis.moveToPoint(34.73, 6, 2000);
-    chassis.turnToHeading(180, 2000);
-    chassis.moveToPose(34.73, -20, 180, 1500, {.maxSpeed = 150});
-    chassis.moveToPose(36.73, 25, 180, 2000, {.forwards = false});
-    pros::delay(1000);
-    intake.telOP(false, true, false, false); // outtake
-}
 
-void leftSideAuton() {
+void leftSideAuton() { //waterloo old ahh auton
   chassis.setPose(0, 0, 0);
 
   //keep piston a, "the wing" activated
@@ -239,7 +216,7 @@ void leftSideAuton() {
                       false);
 }
 
-void leftside() {
+void leftside() { //arjun auton
   chassis.setPose(0, 0, 0);
 
   intake.telOP(true, false, false, false);
@@ -263,11 +240,16 @@ void leftside() {
   chassis.moveToPoint(-35.5, 40, 1000, {.forwards = false, .minSpeed = 200},
                       false);
 }
-#endif
+
 void tuningtest() {
     chassis.setPose(0, 0, 0);
+    
+    //ANGULAR TUNE
     chassis.turnToHeading(90, 5000);
+    
+    //LATERAL TUNE
     // chassis.moveToPoint(0, 48, 5000, {.forwards = true}); // turn to face heading 90 with a very long timeout
+
     pros::delay(3500);
      auto pose = chassis.getPose();
             std::cout << "[DEBUG] X: " << pose.x 
@@ -276,7 +258,7 @@ void tuningtest() {
 
 }
 
-void leftSideAuton() { // eric
+void ericLeftSideAuton() { // eric
     chassis.setPose(0, 0, 0);
     intake.telOP(true, false, false, false); // keep intake on for start
 
@@ -350,13 +332,12 @@ void leftSideAuton() { // eric
 // }
 
 void intakeTest() {
-  intake.telOP(false, false, true, false); //score mid testing
-}
+  //TEST LATER  
+  intake.telOP(false, false, true, false); //score mid testing ->works fine 
+  intake.telOP(true, false, false, false);
+  intake.telOP(false, true, false, false);
 
-// void skills() {
-//   KennyAuton();
-  
-// }
+}
 
 void oldKennyAuton() {
     chassis.setPose(0, 0, 0);
@@ -458,15 +439,73 @@ void autonomous() {
 
 }
 
+void newSkills() {
+
+}
+
+/*
+Started completely from scratch on feb 1 2026
+*/
+void newAuton() {
+  /*
+  For future reference:
+  piston1 = hood
+  piston2 = wing -> booleans are reversed
+  piston3 = matchload
+  */
+  chassis.setPose(0,0,0);
+
+  piston2.set_value(false); //lift the wing so it doesn't interfere
+  chassis.moveToPoint(-5, 27, 5000); //move to the first 3 blocks
+  
+  //After arriving at the blocks, put matchloader down and switch intake on, moving forward a bit too
+  piston3.set_value(true);
+  pros::delay(400);
+  intake.telOP(true, false, false, false); //leave intake on
+  chassis.moveToPoint(-10, 37, 5000, {.forwards = true, .maxSpeed = 80}); //move forward to gather the balls
+  pros::delay(500);
+
+  //Intermediate point to help align with middle goal
+  chassis.moveToPoint(-9, 32, 5000, {.forwards = false});
+
+  chassis.turnToHeading(225, 3000);
+  chassis.moveToPoint(4, 45, 5000, {.forwards = false, .maxSpeed = 40});
+
+  //Score mid
+  intake.telOP(false, false, true, false);
+  pros::delay(1500); //wait for the balls to enter the tube
+  intake.telOP(false, false, false, false); //stop scoring mid
+
+  chassis.moveToPoint(-32, 10, 5000);
+  chassis.turnToHeading(180, 5000);
+  //Note matchloader is already activated
+  intake.telOP(true, false, false, false);
+  chassis.moveToPoint(-32, -10, 5000);
+
+  //Matchload
+  intake.telOP(true, false, false, false);
+  pros::delay(2000);
+
+  chassis.moveToPoint(-32, 32, 5000, {.forwards = false});
+  //Score top
+  piston1.set_value(true); //open up the hood
+  intake.telOP(false, true, false, false);
+  pros::delay(4000);
+
+  //WING PART
+  piston2.set_value(true);
+  chassis.moveToPoint(-32, 20, 5000); //move back a bit
+  chassis.turnToHeading(90, 2000);
+  chassis.moveToPoint(-24, 20, 5000);
+  chassis.turnToHeading(0, 2000);
+  chassis.moveToPoint(-24, 50, 3000, {.minSpeed = 60});
+}
+
 // ============================================================
 // DRIVER CONTROL
 // ============================================================
 
 void opcontrol() {
-  // Use global `piston1Extended`/`piston2Extended`; keep `piston3Extended`
-  // local to opcontrol to manage the extra piston.
-  static bool piston3Extended = false;
-
     while (true) {
         // 1. DRIVE CONTROL (Arcade Drive)
         // Using Left Y for forward/backward and Right X for turning
@@ -506,7 +545,6 @@ void opcontrol() {
           setRoller6(0);
           setRoller7(0);
         }
-        */
 
         // 3. PISTON CONTROL (Toggles)
         // .get_digital_new_press() returns true only on the initial press, 
@@ -527,7 +565,6 @@ void opcontrol() {
           piston3.set_value(piston3Extended);
         }
 
-        // 4. PISTON shortcuts
         // L2: hold-to-open piston A (overrides A-toggle while held)
         if (scoreTopBtn) {
           piston1.set_value(true);

@@ -26,12 +26,12 @@ void Intake::telOP(bool intake, bool scoreTop, bool scoreMid, bool descore) {
     left.move_velocity(-600);    // roller_5 negative
     right.move_velocity(0);
     center.move_velocity(0);
-  } else if (scoreTop) {
+  } else if (scoreTop) { 
     // L2: Score top goal + hood
     left.move_velocity(-600);    // roller_5 negative
     right.move_velocity(-600);   // roller_6 negative
     center.move_velocity(-600);  // roller_7 negative
-  } else if (scoreMid) {
+  } else if (scoreMid) { //confirmed to be working
     // X: Score middle goal
     left.move_velocity(-600);    // roller_5 negative
     right.move_velocity(-600);   // roller_6 negative
