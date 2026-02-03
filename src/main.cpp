@@ -2,6 +2,7 @@
 #include "lemlib/api.hpp"
 #include <cmath>
 #include "SubSystems/intake.hpp"
+#include "pros/distance.hpp"
 #include "pros/motors.hpp"
 
 
@@ -54,6 +55,9 @@ pros::Rotation vertRot(11);
 
 // IMU (port 20)
 pros::Imu imu(20);
+
+//Distance sensor 
+pros::Distance dist(13);
 
 // ============================================================
 // BASIC HELPERS
@@ -443,6 +447,33 @@ void newSkills() {
 
 }
 
+void distanceSensorTest() {
+  const double TARGET_DIST_INCHES = 24.0;  // Stop 24 inches (1 tile) from wall
+  const int DRIVE_SPEED = 60;              // Motor power (adjust as needed)
+  
+  // Keep moving forward until we're within target distance of the wall
+  while (true) {
+    double dist_mm = dist.get_distance();
+    double dist_inches = dist_mm / 25.4;
+    
+    // Check if we've reached target distance
+    if (dist_inches <= TARGET_DIST_INCHES) {
+      break;
+    }
+    
+    // Drive forward (positive = forward for both motor groups)
+    left_motors.move(DRIVE_SPEED);
+    right_motors.move(DRIVE_SPEED);
+    
+    // Small delay to prevent CPU hogging
+    pros::delay(10);
+  }
+  
+  // Stop the motors once we reach the target distance
+  left_motors.move(0);
+  right_motors.move(0);
+}
+
 /*
 Started completely from scratch on feb 1 2026
 */
@@ -479,7 +510,6 @@ void newAuton() {
   chassis.moveToPoint(-32, 10, 5000);
   chassis.turnToHeading(180, 5000);
   //Note matchloader is already activated
-  intake.telOP(true, false, false, false);
   chassis.moveToPoint(-32, -10, 5000);
 
   //Matchload
