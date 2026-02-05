@@ -1,6 +1,7 @@
 #include "main.h"
 #include "lemlib/api.hpp"
 #include <cmath>
+#include <future>
 #include "SubSystems/intake.hpp"
 #include "pros/distance.hpp"
 #include "pros/motors.hpp"
@@ -26,10 +27,10 @@ pros::Motor roller_6(6, pros::MotorGearset::blue);
 pros::Motor roller_7(7, pros::MotorGearset::blue);
 
 // Pneumatics
-pros::adi::DigitalOut piston1('C'); //hood 
+pros::adi::DigitalOut piston1('A'); //hood 
 pros::adi::DigitalOut piston2('B'); //wing
 // Additional piston on port C
-pros::adi::DigitalOut piston3('A'); //matchloader
+pros::adi::DigitalOut piston3('C'); //matchloader
 
 Intake intake(roller_5, roller_6, roller_7);
 
@@ -398,12 +399,13 @@ void newAuton() {
   piston3 = matchload
   */
   chassis.setPose(0,0,0);
-
+  
+  piston3.set_value(true); //start with matchloader retracted
   piston2.set_value(false); //lift the wing so it doesn't interfere
-  chassis.moveToPoint(-5, 27, 5000, {.maxSpeed = 40}); //move to the first 3 blocks
+  chassis.moveToPoint(-5, 27, 5000, {.maxSpeed = 40}, false); //move to the first 3 blocks
   
   //After arriving at the blocks, put matchloader down and switch intake on, moving forward a bit too
-  piston3.set_value(true);
+  piston3.set_value(false);
   pros::delay(400);
   intake.telOP(true, false, false, false); //leave intake on
   chassis.moveToPoint(-10, 37, 5000, {.forwards = true, .maxSpeed = 80}); //move forward to gather the balls
@@ -412,7 +414,7 @@ void newAuton() {
   //Intermediate point to help align with middle goal
   chassis.moveToPoint(-9, 32, 5000, {.forwards = false});
 
-  chassis.turnToHeading(225, 3000);
+  chassis.turnToHeading(225, 1300);
   chassis.moveToPoint(4, 45, 5000, {.forwards = false, .maxSpeed = 40});
 
   //Score mid
@@ -421,27 +423,29 @@ void newAuton() {
   intake.telOP(false, false, false, false); //stop scoring mid
 
   chassis.moveToPoint(-32, 10, 5000);
-  chassis.turnToHeading(180, 5000);
+  chassis.turnToHeading(180, 1300);
   //Note matchloader is already activated
-  chassis.moveToPoint(-32, 0, 5000);
+  chassis.moveToPoint(-32, -5, 2500, {.minSpeed = 60});
+  //Move to matchload with low velocity so it doesn't mess up odom
+  // chassis.moveToPoint(-32, -15, 5000, {.maxSpeed = 30});
 
   //Matchload
   intake.telOP(true, false, false, false);
-  pros::delay(2000);
+  pros::delay(2100);
 
-  chassis.moveToPoint(-32, 32, 5000, {.forwards = false});
+  chassis.moveToPoint(-32, 27, 5000, {.forwards = false, .maxSpeed = 50});
   //Score top
   piston1.set_value(true); //open up the hood
   intake.telOP(false, true, false, false);
-  pros::delay(500);
+  pros::delay(2000);
 
   //WING PART
   piston2.set_value(true);
   chassis.moveToPoint(-32, 20, 5000); //move back a bit
-  chassis.turnToHeading(90, 2000);
-  chassis.moveToPoint(-24, 20, 5000);
-  chassis.turnToHeading(0, 2000);
-  chassis.moveToPoint(-24, 50, 3000, {.minSpeed = 60});
+  chassis.turnToHeading(90, 1300);
+  chassis.moveToPoint(-20, 20, 5000);
+  chassis.turnToHeading(180, 1300);
+  chassis.moveToPoint(-20, 35, 3000, {.forwards = false, .minSpeed = 60});
 }
 
 void autonomous() {
