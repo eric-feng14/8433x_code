@@ -32,7 +32,7 @@ pros::adi::DigitalOut piston2('B'); //wing
 // Additional piston on port C
 pros::adi::DigitalOut piston3('C'); //matchloader
 
-Intake intake(roller_5, roller_6, roller_7);
+Intake intake(roller_5, roller_6, roller_7, piston1);
 
 constexpr bool REV_LEFT_DRIVE  = false;
 constexpr bool REV_RIGHT_DRIVE = false;
@@ -151,6 +151,8 @@ lemlib::ControllerSettings angular_controller(1.25, // proportional gain (kP)
 
 lemlib::Chassis chassis(drivetrain, lateral_controller, angular_controller, sensors);
 
+const int MOVE_TIMEOUT = 5000, TURN_TIMEOUT = 1000;
+
 // ============================================================
 // PROS DEFAULTS
 // ============================================================
@@ -177,46 +179,6 @@ void initialize() {
 
 void disabled() {}
 void competition_initialize() {}
-
-
-void leftSideAuton() { //waterloo old ahh auton
-  chassis.setPose(0, 0, 0);
-
-  //keep piston a, "the wing" activated
-  piston1.set_value(true);
-
-  intake.telOP(true, false, false, false);
-  chassis.moveToPose(-8.6, 37, -21, 2000, {.minSpeed = 50}, false);
-  pros::delay(300);
-  chassis.turnToHeading(-131, 1000); // fix
-  chassis.moveToPose(7, 44, -131, 1500, {.forwards = false});
-  roller_7.move(5);
-  pros::delay(1300);
-
-  // Activate piston B for middle goal match load and score
-  intake.telOP(false, false, true, false);
-  pros::delay(400);
-
-  // intake.telOP(true, false, false, false);
-  pros::delay(2000);
-  chassis.moveToPoint(-34.73, 8, 2000);
-  chassis.turnToHeading(180, 2000);
-  piston2.set_value(true);
-  chassis.moveToPoint(-36, -20, 2000, {.maxSpeed = 40});
-  chassis.moveToPoint(-35.5, 30, 2000, {.forwards = false, .maxSpeed = 80},
-                      false);
-  piston2.set_value(false);
-
-  // Activate piston B for long goal match load and score
-  piston2.set_value(true);
-  intake.telOP(false, true, false, false);
-  pros::delay(2000);
-  piston2.set_value(false);
-
-  chassis.moveToPoint(-35.5, 17, 1000, {.minSpeed = 60}, false);
-  chassis.moveToPoint(-35.5, 40, 1000, {.forwards = false, .minSpeed = 200},
-                      false);
-}
 
 void leftside() { //arjun auton
   chassis.setPose(0, 0, 0);
@@ -260,78 +222,9 @@ void tuningtest() {
 
 }
 
-void ericLeftSideAuton() { // eric
-    chassis.setPose(0, 0, 0);
-    intake.telOP(true, false, false, false); // keep intake on for start
-
-    chassis.moveToPoint(-13.60, 47.6518, 3000, {.maxSpeed = 40});
-    pros::delay(1000);
-    intake.telOP(false, false, false, false); // turn off intake
-
-    chassis.moveToPose(5.20893, 55.1891,-130, 3000, {.forwards = false, .maxSpeed = 40});
-    intake.telOP(false, false, true, false); // score intaked balls into mid
-    pros::delay(1500);
-
-    chassis.moveToPoint(-30.3277, 10.443, 3000, {.maxSpeed = 40});
-    chassis.turnToHeading(180, 2000);
-    chassis.moveToPoint(-30.6277, -2.36389, 3000, {.maxSpeed = 40});
-    intake.telOP(true, false, false, false);
-    // piston1.set_value(true);
-    // piston2.set_value(true);
-
-    chassis.moveToPoint(-30.687, 48.551, 3000, {.forwards = false, .maxSpeed = 40});
-    intake.telOP(false, true, false, false);
-}
 // ============================================================
 // AUTON (WAYPOINTS)
 // ============================================================
-
-
-
-// void KennyAuton(){
-//     chassis.setPose(0, 0, 0);
-//     // doinker.set_value(true);
-//     // piston3.set_value(false);
-//     piston2.set_value(false); // wing piston out
-//     intake.telOP(true, false, false, false); // keep intake on
-//     chassis.moveToPose(-1.5, 30.3, -11.4, 2000, {.minSpeed = 50}, false);
-//     pros::delay(300);
-//     chassis.turnToHeading(-135, 1000);
-//     chassis.moveToPose(-1.5, 55.8, -135, 3000, {.forwards=false, .minSpeed = 60}, false);
-//     // intake.telOP(false, false, true, false, false, false);
-//     intake.telOP(false, false, true, false); // score mid
-
-//     pros::delay(1200);
-//     // intake.telOP(true, false, false, false, false, false);
-//     intake.telOP(true, false, false, false); // intake
-
-//     pros::delay(200);
-//     chassis.moveToPoint(-30.8, 11.3, 2000);
-//     pros::delay(200);
-//     chassis.turnToHeading(180, 1000);
-//     // tongue.set_value(true);
-//     piston3.set_value(true); // matchloader piston out
-
-//     piston3.set_value(true); //
-//     piston1.set_value(true); //hopefully its the hood
-//     chassis.moveToPoint(-27.3, -3.9, 1700, {.maxSpeed = 40});
-//     chassis.moveToPoint(-35.8, 26.9, 1000, {.forwards=false, .maxSpeed = 80}, false);
-//     // intake.telOP(false, true, false, false, false, false); // bro wth does this do
-//     intake.telOP(false, true, false, false); // score top long
-
-//     pros::delay(2000);
-//     // tongue.set_value(false);
-//     // piston3.set_value(true); // matchloader piston in
-
-//     chassis.moveToPoint(-30.9, 11.6, 1000, {.minSpeed = 60}, false);
-//     chassis.turnToHeading(70, 1000);
-//     chassis.moveToPoint(-18.3, 18.2, 1000, {.forwards = false});
-//     chassis.turnToHeading(150, 1000);
-//     // doinker.set_value(false);
-//     piston1.set_value(false); // wing piston in
-
-//     chassis.moveToPoint(-36.1, 43.7, 3000, {.forwards=false, .maxSpeed = 60}, false);
-// }
 
 void intakeTest() {
   //TEST LATER  
@@ -388,6 +281,16 @@ void oldKennyAuton() {
 
 }
 
+void matchload() {
+  intake.telOP(true, false, false, false);
+  pros::delay(2500);
+}
+
+void scoreTop() {
+  intake.telOP(false, true, false, false);
+  pros::delay(2500);
+}
+
 /*
 Started completely from scratch on feb 1 2026
 */
@@ -430,8 +333,7 @@ void newAuton() {
   // chassis.moveToPoint(-32, -15, 5000, {.maxSpeed = 30});
 
   //Matchload
-  intake.telOP(true, false, false, false);
-  pros::delay(2100);
+  matchload();
 
   chassis.moveToPoint(-32, 27, 5000, {.forwards = false, .maxSpeed = 50});
   //Score top
@@ -454,60 +356,73 @@ void autonomous() {
     newAuton();
     // tuningtest();
     
-    /*
-    old auton
+}
 
-    chassis.setPose(0, 0, 0);
-    // doinker.set_value(true);
-    // piston3.set_value(false);
-    piston2.set_value(false); // wing piston out
-    intake.telOP(true, false, false, false); // keep intake on
-    chassis.moveToPose( -12, 37, -21, 2000, {.minSpeed = 40}, false);
-    pros::delay(300);
-    chassis.turnToHeading(-131, 1000); // fix
-    chassis.moveToPose(7, 44, -131, 1600,{.forwards=false, .minSpeed = 60}, false);
-    // intake.telOP(false, false, true, false, false, false);
-    intake.telOP(false, false, true, false); // score mid
 
-    pros::delay(400);
-    // intake.telOP(true, false, false, false, false, false);
-    intake.telOP(true, false, false, false); // intake
-
-    pros::delay(200);
-    chassis.moveToPoint(-30, 8, 2000);
-    pros::delay(200);
-    chassis.turnToHeading(180, 1000);
-    // tongue.set_value(true);
-    piston3.set_value(true); // matchloader piston out
-
-    piston3.set_value(true); //
-    piston1.set_value(true); //hopefully its the hood
-    chassis.moveToPoint(-30, -20, 1700, {.maxSpeed = 40});
-    chassis.moveToPoint(-30, 30, 1000, {.forwards=false,.maxSpeed = 80}, false);
-    // intake.telOP(false, true, false, false, false, false); // bro wth does this do
-    intake.telOP(false, true, false, false); // score top long
-
-    pros::delay(2000);
-    // tongue.set_value(false);
-    // piston3.set_value(true); // matchloader piston in
-
-    // chassis.moveToPoint(-34, 17, 1000, {.minSpeed = 60}, false);
-    // chassis.turnToHeading(130, 1000);
-    // chassis.moveToPoint(-44, 22, 1000, {.forwards = false});
-    // chassis.turnToHeading(180, 1000);
-    // doinker.set_value(false);
-//     piston1.set_value(false); // wing piston in
-
-//     chassis.moveToPoint(-44, 45, 3000, {.forwards=false, .maxSpeed = 60}, false);
-    
-    // intakeTest();
-    // tuningtest();
+/*
+Autonomous skills started on feb 4 2026. Relies purely on odom, without any distance/optical sensors.
+*/
+void skills_cycle() {
+  /*
+  piston1 = hood
+  piston2 = wing
+  psiton3 = matchload
+  Sidenote: maybe jiggling the matchloader back and forth can allow it to intake more easily?
   */
+
+  //Piston starting setup
+  piston3.set_value(false); //keep matchload down
+  piston2.set_value(false); // keep wing up
+
+  chassis.moveToPoint(2, 40, MOVE_TIMEOUT);
+  chassis.turnToHeading(270, TURN_TIMEOUT);
+  //move to the first matchload and matchload
+  chassis.moveToPoint(-15, 40, MOVE_TIMEOUT);
+  matchload();
+  //Move back
+  chassis.moveToPoint(2, 40, MOVE_TIMEOUT, {.forwards = false});
+  chassis.turnToHeading(225, TURN_TIMEOUT);
+  
+  chassis.moveToPoint(22, 55, MOVE_TIMEOUT,{.forwards = false});
+  chassis.turnToHeading(270, TURN_TIMEOUT);
+  
+  chassis.moveToPoint(95, 55, MOVE_TIMEOUT,{.forwards = false});
+  chassis.turnToHeading(180, TURN_TIMEOUT);
+  
+  chassis.moveToPoint(95, 40, MOVE_TIMEOUT);
+  chassis.turnToHeading(90, TURN_TIMEOUT);
+
+  //SCORE !!!
+  chassis.moveToPoint(74, 40, MOVE_TIMEOUT, {.forwards = false});
+  scoreTop(); //should open up hood
+
+  //move to second matchload 
+  chassis.moveToPoint(115, 40, MOVE_TIMEOUT);
+  matchload();
+
+  //SCORE AGAIN!!
+  chassis.moveToPoint(74, 40, MOVE_TIMEOUT, {.forwards = false});
+  scoreTop();
+
+  chassis.moveToPoint(95, 40, MOVE_TIMEOUT);
+  chassis.turnToHeading(180, TURN_TIMEOUT);
+
+    //Then reset and repeat (eg call this function again, after setPose(0,0,0)
 }
 
-void newSkills() {
-
+void skills() {
+  chassis.setPose(0,0,0);
+  skills_cycle();
+  chassis.moveToPoint(99, -13, MOVE_TIMEOUT);
+  chassis.setPose(0,0,0);
+  skills_cycle();
+  chassis.moveToPoint(99, -6, MOVE_TIMEOUT);
+  //Go for park at the end
+  chassis.turnToHeading(90, TURN_TIMEOUT);
+  chassis.moveToPoint(120, -6, MOVE_TIMEOUT);
+  intake.telOP(true, false, false, false);
 }
+
 
 void distanceSensorTest() {
   const double TARGET_DIST_INCHES = 24.0;  // Stop 24 inches (1 tile) from wall
