@@ -12,15 +12,15 @@ Button mappings (in opcontrol):
   R1 (held) -> descore: descore from matchload
 */
 
-Intake::Intake(pros::Motor& roller_5, pros::Motor& roller_6, pros::Motor& roller_7, pros::adi::DigitalOut& piston1)
-    : left(roller_5), right(roller_6), center(roller_7), hood_piston(hood_piston) {}
+Intake::Intake(pros::Motor& roller_5, pros::Motor& roller_6, pros::Motor& roller_7)
+    : left(roller_5), right(roller_6), center(roller_7) {}
 
 void Intake::telOP(bool intake, bool scoreTop, bool scoreMid, bool descore) {
-  if (descore) {
+  if (descore) { //score low
     // R1: Descore everything from matchload
-    left.move_velocity(600);   // roller_5 positive
-    right.move_velocity(0);
-    center.move_velocity(0);
+    left.move_velocity(300);   // roller_5 positive
+    right.move_velocity(600);
+    center.move_velocity(600);
   } else if (intake) {
     // L1: Stack/intake
     left.move_velocity(-600);    // roller_5 negative
@@ -31,17 +31,15 @@ void Intake::telOP(bool intake, bool scoreTop, bool scoreMid, bool descore) {
     left.move_velocity(-600);    // roller_5 negative
     right.move_velocity(-600);   // roller_6 negative
     center.move_velocity(-600);  // roller_7 negative
-    hood_piston.set_value(false);     // open hood
   } else if (scoreMid) { //confirmed to be working
     // X: Score middle goal
     left.move_velocity(-600);    // roller_5 negative
     right.move_velocity(-600);   // roller_6 negative
-    center.move_velocity(600);   // roller_7 positive
+    center.move_velocity(300);   // roller_7 positive
   } else {
     // Stop all rollers
     left.move_velocity(0);
     right.move_velocity(0);
     center.move_velocity(0);
   }
-  // hood_piston.set_value(true); // close hood when not scoring top -> prob not a necessary line of code (check ltr tho)
 }

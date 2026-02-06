@@ -31,8 +31,9 @@ pros::adi::DigitalOut piston1('A'); //hood
 pros::adi::DigitalOut piston2('B'); //wing
 // Additional piston on port C
 pros::adi::DigitalOut piston3('C'); //matchloader
+pros::adi::DigitalOut piston4('D'); //low goal piston
 
-Intake intake(roller_5, roller_6, roller_7, piston1);
+Intake intake(roller_5, roller_6, roller_7);
 
 constexpr bool REV_LEFT_DRIVE  = false;
 constexpr bool REV_RIGHT_DRIVE = false;
@@ -46,6 +47,7 @@ constexpr bool REV_ROLLER_7 = false;
 bool piston1Extended = true;
 bool piston2Extended = false;
 bool piston3Extended = false;
+bool piston4Extended = false;
 
 // Controller
 pros::Controller master(pros::E_CONTROLLER_MASTER);
@@ -58,7 +60,9 @@ pros::Rotation vertRot(11);
 pros::Imu imu(10);
 
 //Distance sensor 
-pros::Distance dist(14);
+pros::Distance frontDist(13);
+pros::Distance leftDist(12); 
+pros::Distance rightDist(14);
 
 // ============================================================
 // BASIC HELPERS
@@ -287,25 +291,34 @@ void matchload() {
 }
 
 void scoreTop() {
+  piston1.set_value(false); //lift hood up -> boolean is reversed
   intake.telOP(false, true, false, false);
   pros::delay(2500);
 }
 
+void scoreLow() { //may need fixing later
+  piston4.set_value(true);
+  intake.telOP(false, false, false, true);
+  pros::delay(2000);
+  piston4.set_value(false);
+}
+
 /*
 Started completely from scratch on feb 1 2026
+Fully working and consistent
 */
-void newAuton() {
+void leftAuton() {
   /*
   For future reference:
-  piston1 = hood
-  piston2 = wing -> booleans are reversed
-  piston3 = matchload
+  piston1 = hood, false = up, true = down
+  piston2 = wing, false = down, true = up
+  piston3 = matchload, true = retracted
   */
   chassis.setPose(0,0,0);
   
   piston3.set_value(true); //start with matchloader retracted
   piston2.set_value(false); //lift the wing so it doesn't interfere
-  chassis.moveToPoint(-5, 27, 5000, {.maxSpeed = 40}, false); //move to the first 3 blocks
+  chassis.moveToPoint(-5, 27, 5000, {.maxSpeed=40}, false); //move to the first 3 blocks
   
   //After arriving at the blocks, put matchloader down and switch intake on, moving forward a bit too
   piston3.set_value(false);
@@ -318,46 +331,153 @@ void newAuton() {
   chassis.moveToPoint(-9, 32, 5000, {.forwards = false});
 
   chassis.turnToHeading(225, 1300);
-  chassis.moveToPoint(4, 45, 5000, {.forwards = false, .maxSpeed = 40});
+  chassis.moveToPoint(4.5, 43, 5000, {.forwards = false, .maxSpeed = 40}, false);
 
   //Score mid
   intake.telOP(false, false, true, false);
   pros::delay(1500); //wait for the balls to enter the tube
   intake.telOP(false, false, false, false); //stop scoring mid
 
-  chassis.moveToPoint(-32, 10, 5000);
+  chassis.moveToPoint(-30, 10, 5000);
   chassis.turnToHeading(180, 1300);
   //Note matchloader is already activated
-  chassis.moveToPoint(-32, -5, 2500, {.minSpeed = 60});
+  chassis.moveToPoint(-30, -7, 2500, {.minSpeed = 60});
+
+  matchload();
+
+  chassis.moveToPoint(-30, 29, 5000, {.forwards = false, .maxSpeed = 60}, false);
+  
+  scoreTop();
+
+  //WING PART
+  piston2.set_value(true);
+  chassis.moveToPoint(-30, 20, 5000); //move back a bit
+  chassis.turnToHeading(90, 1300);
+  chassis.moveToPoint(-18, 20, 5000);
+  chassis.turnToHeading(180, 1300);
+  chassis.moveToPoint(-18, 35, 3000, {.forwards = false, .minSpeed = 60});
+}
+
+void rightAuton() {
+  /*
+  For future reference:
+  piston1 = hood
+  piston2 = wing -> booleans are reversed
+  piston3 = matchload
+  */
+  chassis.setPose(0,0,0);
+  
+  piston3.set_value(true); //start with matchloader retracted
+  piston2.set_value(false); //lift the wing so it doesn't interfere
+  intake.telOP(true, false, false, false); //leave intake on
+  chassis.moveToPoint(5, 27, 5000, {.maxSpeed = 70}, false); //move to the first 3 blocks
+  
+  //After arriving at the blocks, put matchloader down and switch intake on, moving forward a bit too
+  piston3.set_value(false);
+  pros::delay(400);
+  
+  chassis.moveToPoint(10, 37, 5000, {.forwards = true, .maxSpeed = 80}); //move forward to gather the balls
+  pros::delay(600);
+  //put matchloader back up
+  piston3.set_value(true);
+
+  //Intermediate point to help align with middle goal
+  chassis.moveToPoint(9, 32, 5000, {.forwards = false});
+
+  chassis.turnToHeading(315, 1300);
+  //OLD WORKING MID LOW GOAL POINT
+  // chassis.moveToPoint(-8, 42, 5000, {.forwards = true, .maxSpeed = 40}, false);
+  chassis.moveToPoint(-8, 42.5, 5000, {.forwards = true, .maxSpeed = 40}, false);
+  chassis.turnToHeading(315, 1300);
+
+  //Score low
+  scoreLow();
+
+  chassis.moveToPoint(5, 27, 5000, {.forwards = false, .maxSpeed = 40}, false);
+  chassis.moveToPoint(30, 12, 5000, {.maxSpeed = 60}, false);
+
+  chassis.turnToHeading(180, 1300);
+  piston3.set_value(false); //put matchloader back down
+  //Note matchloader is already activated
+  chassis.moveToPoint(29, -8, 3500, {.maxSpeed = 45}); //NOTE: CHANGED THE X VALUE EVEN THOUGH IT SHOULD BE THE SAME AS ONE ABOVE
   //Move to matchload with low velocity so it doesn't mess up odom
   // chassis.moveToPoint(-32, -15, 5000, {.maxSpeed = 30});
-
+  
   //Matchload
   matchload();
 
-  chassis.moveToPoint(-32, 27, 5000, {.forwards = false, .maxSpeed = 50});
+  chassis.moveToPoint(30, 27, 2100, {.forwards = false, .maxSpeed = 50}, false);
   //Score top
-  piston1.set_value(true); //open up the hood
+  piston1.set_value(false); //open up the hood
   intake.telOP(false, true, false, false);
   pros::delay(2000);
 
   //WING PART
   piston2.set_value(true);
-  chassis.moveToPoint(-32, 20, 5000); //move back a bit
-  chassis.turnToHeading(90, 1300);
-  chassis.moveToPoint(-20, 20, 5000);
-  chassis.turnToHeading(180, 1300);
-  chassis.moveToPoint(-20, 35, 3000, {.forwards = false, .minSpeed = 60});
+  chassis.moveToPoint(30, 18, 5000); //move back a bit
+  chassis.turnToHeading(270, 1300, {.minSpeed = 60});
+  chassis.moveToPoint(40, 20, 5000, {.forwards = false});
+  chassis.turnToHeading(180, 1300, {.minSpeed = 60});
+  chassis.moveToPoint(40, 35, 3000, {.forwards = false, .minSpeed = 60});
 }
 
-void autonomous() {
-    // leftSideAuton();
-    // oldKennyAuton();
-    newAuton();
-    // tuningtest();
+/**
+ * Drive forward a specified distance while maintaining 24 inches from the left wall.
+ * 
+ * @param travelDistance Distance to travel in inches
+ * @param basePower Base motor power (0-127), default 60
+ * @param kP Proportional gain for wall correction, default 3.0
+ */
+void driveAlongWall(double travelDistance, int basePower = 60, double kP = 3.0) {
+  const double TARGET_WALL_DIST_INCHES = 24.0;  // Target distance from wall
+  const int MAX_CORRECTION = 30; // Limit correction to prevent spinning
+  
+  // Record starting position from odometry
+  lemlib::Pose startPose = chassis.getPose();
+  // double startX = startPose.x;
+  // double startY = startPose.y;
+  
+  while (true) {
+    // Calculate distance traveled using odometry
+    lemlib::Pose currentPose = chassis.getPose();
+    // double dx = currentPose.x - startX;
+    // double dy = currentPose.y - startY;
+    // double distanceTraveled = std::sqrt(dx * dx + dy * dy);
+    double distanceTraveled = startPose.distance(currentPose);
     
-}
+    // Exit when we've traveled the target distance
+    if (distanceTraveled >= travelDistance) {
+      break;
+    }
+    
+    // Get distance from left wall
+    double wallDist_mm = leftDist.get();
+    double wallDist_inches = wallDist_mm / 25.4;
+    
+    // Simple proportional control to maintain target distance from wall
+    // Positive error = too far from wall, negative = too close
+    double error = wallDist_inches - TARGET_WALL_DIST_INCHES;
+    int correction = static_cast<int>(error * kP);
+    
+    // Clamp correction to prevent motors from reversing (which causes spinning)
+    if (correction > MAX_CORRECTION) correction = MAX_CORRECTION;
+    if (correction < -MAX_CORRECTION) correction = -MAX_CORRECTION;
 
+    
+    // Apply correction: too close to wall -> turn right (away), too far -> turn left (toward)
+    int leftPower = basePower + correction;
+    int rightPower = basePower - correction;
+    
+    left_motors.move(leftPower);
+    right_motors.move(rightPower);
+    
+    pros::delay(20); // Small delay to prevent CPU hogging
+  }
+  
+  // Stop motors when done
+  left_motors.move(0);
+  right_motors.move(0);
+}
 
 /*
 Autonomous skills started on feb 4 2026. Relies purely on odom, without any distance/optical sensors.
@@ -380,32 +500,35 @@ void skills_cycle() {
   chassis.moveToPoint(-15, 40, MOVE_TIMEOUT);
   matchload();
   //Move back
-  chassis.moveToPoint(2, 40, MOVE_TIMEOUT, {.forwards = false});
+  chassis.moveToPoint(2, 37, MOVE_TIMEOUT, {.forwards = false});
   chassis.turnToHeading(225, TURN_TIMEOUT);
   
-  chassis.moveToPoint(22, 55, MOVE_TIMEOUT,{.forwards = false});
+  chassis.moveToPoint(22, 48, MOVE_TIMEOUT,{.forwards = false, .maxSpeed = 67});
   chassis.turnToHeading(270, TURN_TIMEOUT);
   
-  chassis.moveToPoint(95, 55, MOVE_TIMEOUT,{.forwards = false});
+  chassis.moveToPoint(95, 48, MOVE_TIMEOUT,{.forwards = false, .maxSpeed = 67});
   chassis.turnToHeading(180, TURN_TIMEOUT);
   
-  chassis.moveToPoint(95, 40, MOVE_TIMEOUT);
+  chassis.moveToPoint(95, 37, MOVE_TIMEOUT);
   chassis.turnToHeading(90, TURN_TIMEOUT);
 
   //SCORE !!!
-  chassis.moveToPoint(74, 40, MOVE_TIMEOUT, {.forwards = false});
+  chassis.moveToPoint(74, 37, MOVE_TIMEOUT, {.forwards = false});
   scoreTop(); //should open up hood
 
-  //move to second matchload 
-  chassis.moveToPoint(115, 40, MOVE_TIMEOUT);
+  //move to second matchload -> this one caused some misalignment (maybe x value is too much)
+  chassis.moveToPoint(115, 37, MOVE_TIMEOUT, {.forwards = true, .maxSpeed = 67});
   matchload();
 
   //SCORE AGAIN!!
-  chassis.moveToPoint(74, 40, MOVE_TIMEOUT, {.forwards = false});
+  chassis.moveToPoint(74, 37, MOVE_TIMEOUT, {.forwards = false});
   scoreTop();
 
-  chassis.moveToPoint(95, 40, MOVE_TIMEOUT);
+  chassis.moveToPoint(95, 37, MOVE_TIMEOUT);
   chassis.turnToHeading(180, TURN_TIMEOUT);
+
+  //RECALIBRATE USING DISTANCE SENSOR
+  
 
     //Then reset and repeat (eg call this function again, after setPose(0,0,0)
 }
@@ -413,7 +536,7 @@ void skills_cycle() {
 void skills() {
   chassis.setPose(0,0,0);
   skills_cycle();
-  chassis.moveToPoint(99, -13, MOVE_TIMEOUT);
+  chassis.moveToPoint(99, -13, MOVE_TIMEOUT, {}, false);
   chassis.setPose(0,0,0);
   skills_cycle();
   chassis.moveToPoint(99, -6, MOVE_TIMEOUT);
@@ -424,40 +547,15 @@ void skills() {
 }
 
 
-void distanceSensorTest() {
-  const double TARGET_DIST_INCHES = 24.0;  // Stop 24 inches (1 tile) from wall
-  const int DRIVE_SPEED = 60;              // Motor power (adjust as needed)
-  
-  // Keep moving forward until we're within target distance of the wall
-  while (true) {
-    double dist_mm = dist.get_distance();
-    double dist_inches = dist_mm / 25.4;
-    
-    // Check if we've reached target distance
-    if (dist_inches <= TARGET_DIST_INCHES) {
-      break;
-    }
-    
-    // Drive forward (positive = forward for both motor groups)
-    left_motors.move(DRIVE_SPEED);
-    right_motors.move(DRIVE_SPEED);
-    
-    // Small delay to prevent CPU hogging
-    pros::delay(10);
-  }
-  
-  // Stop the motors once we reach the target distance
-  left_motors.move(0);
-  right_motors.move(0);
-}
-
-void recallibrate() {
-  distanceSensorTest();
-  //turn right
-  chassis.turnToHeading(90, 5000);
-  //turn left
-  chassis.turnToHeading(-90, 5000);
-  distanceSensorTest();
+void autonomous() {
+    // leftSideAuton();
+    // oldKennyAuton();
+    leftAuton();
+    // tuningtest();
+    // skills();
+    // rightAuton();
+    // scoreLow();
+    // driveAlongWall(48);
 }
 
 
@@ -538,6 +636,11 @@ void opcontrol() {
           piston3.set_value(piston3Extended);
         }
 
+        if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_B)) {
+          piston4Extended = !piston4Extended;
+          piston4.set_value(piston4Extended);
+        }
+
         // piston2 follows the toggled state (R2 toggles it)
         piston2.set_value(piston2Extended);
 
@@ -546,7 +649,9 @@ void opcontrol() {
             auto pose = chassis.getPose();
             std::cout << "[DEBUG] X: " << pose.x 
                       << " Y: " << pose.y 
-                      << " Theta: " << pose.theta << std::endl;
+                      << " Theta: " << pose.theta
+                      << " | Left Dist (in): " << leftDist.get() / 25.4
+                      << " | Front Dist (in): " << frontDist.get() / 25.4 << std::endl;
         }
 
 
