@@ -35,7 +35,7 @@ void Intake::telOP(bool intake, bool scoreTop, bool scoreMid, bool descore) {
     // X: Score middle goal
     left.move_velocity(-600);    // roller_5 negative
     right.move_velocity(-600);   // roller_6 negative
-    center.move_velocity(300);   // roller_7 positive
+    center.move_velocity(600);   // roller_7 positive
   } else {
     // Stop all rollers
     left.move_velocity(0);
