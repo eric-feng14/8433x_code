@@ -319,6 +319,59 @@ void leftAuton() {
   piston3.set_value(true); //start with matchloader retracted
   piston2.set_value(false); //lift the wing so it doesn't interfere
   intake.telOP(true, false, false, false); //leave intake on
+  chassis.moveToPoint(-5, 27, 1500, {.maxSpeed = 100}, false); //move to the first 3 blocks
+  
+  //After arriving at the blocks, put matchloader down, moving forward a bit too
+  piston3.set_value(false);
+  pros::delay(100);
+  chassis.moveToPoint(-10, 37, 1200, {.forwards = true, .maxSpeed = 110}); //move forward to gather the balls
+  pros::delay(150);
+  piston3.set_value(true); //put matchloader back up
+
+  //Intermediate point to help align with middle goal
+  chassis.moveToPoint(-9, 32, 1200, {.forwards = false});
+
+  chassis.turnToHeading(225, 600);
+  chassis.moveToPoint(4.5, 43, 1500, {.forwards = false, .maxSpeed = 80}, false);
+
+  //Score mid
+  intake.telOP(false, false, true, false);
+  pros::delay(1100); //wait for the balls to enter the tube
+  intake.telOP(false, false, false, false); //stop scoring mid
+
+  chassis.moveToPoint(-34, 10, 2000);
+  chassis.turnToHeading(180, 800);
+  //Note matchloader is already activated
+  piston3.set_value(false); //put matchloader back down
+  chassis.moveToPoint(-34, -7, 2000, {.maxSpeed = 62});
+
+  matchload();
+
+  chassis.moveToPoint(-34, 30, 1200, {.forwards = false, .maxSpeed = 90}, false);
+  
+  scoreTop();
+
+  //WING PART
+  piston2.set_value(true);
+  chassis.moveToPoint(-34, 20, 1500); //move back a bit
+  chassis.turnToHeading(90, 1000, {.minSpeed = 50});
+  chassis.moveToPoint(-26, 20, 1500);
+  chassis.turnToHeading(180, 1000, {.minSpeed = 50});
+  chassis.moveToPoint(-26, 29, 1500, {.forwards = false, .minSpeed = 60});
+}
+
+void slowLeftAuton() {
+  /*
+  For future reference:
+  piston1 = hood, false = up, true = down
+  piston2 = wing, false = down, true = up
+  piston3 = matchload, true = retracted
+  */
+  chassis.setPose(0,0,0);
+  
+  piston3.set_value(true); //start with matchloader retracted
+  piston2.set_value(false); //lift the wing so it doesn't interfere
+  intake.telOP(true, false, false, false); //leave intake on
   chassis.moveToPoint(-5, 27, 5000, {.maxSpeed=40}, false); //move to the first 3 blocks
   
   //After arriving at the blocks, put matchloader down, moving forward a bit too
@@ -367,58 +420,59 @@ void rightAuton() {
   */
   chassis.setPose(0,0,0);
   
+  piston4.set_value(false); //keep low goal piston retracted
   piston3.set_value(true); //start with matchloader retracted
   piston2.set_value(false); //lift the wing so it doesn't interfere
   intake.telOP(true, false, false, false); //leave intake on
-  chassis.moveToPoint(5, 27, 5000, {.maxSpeed = 70}, false); //move to the first 3 blocks
+  chassis.moveToPoint(5, 27, 1500, {.maxSpeed = 100}, false); //move to the first 3 blocks
   
   //After arriving at the blocks, put matchloader down and switch intake on, moving forward a bit too
   piston3.set_value(false);
-  pros::delay(400);
+  pros::delay(100);
   
-  chassis.moveToPoint(10, 37, 5000, {.forwards = true, .maxSpeed = 80}); //move forward to gather the balls
-  pros::delay(600);
+  chassis.moveToPoint(10, 37, 1200, {.forwards = true, .maxSpeed = 110}); //move forward to gather the balls
+  pros::delay(150);
   //put matchloader back up
   piston3.set_value(true);
 
   //Intermediate point to help align with middle goal
-  chassis.moveToPoint(9, 32, 5000, {.forwards = false});
+  chassis.moveToPoint(9, 32, 1200, {.forwards = false});
 
-  chassis.turnToHeading(315, 1300);
-  //OLD WORKING MID LOW GOAL POINT
-  // chassis.moveToPoint(-8, 42, 5000, {.forwards = true, .maxSpeed = 40}, false);
-  chassis.moveToPoint(-8, 42.5, 5000, {.forwards = true, .maxSpeed = 40}, false);
-  chassis.turnToHeading(315, 1300);
+  chassis.turnToHeading(315, 600);
+  chassis.moveToPoint(-7, 43, 1500, {.forwards = true, .maxSpeed = 80}, false);
+  chassis.turnToHeading(315, 500, {}, false);
 
   //Score low
-  scoreLow();
+  piston4.set_value(true);
+  intake.telOP(false, false, false, true);
+  pros::delay(1100);
+  piston4.set_value(false);
 
-  chassis.moveToPoint(5, 27, 5000, {.forwards = false, .maxSpeed = 40}, false);
-  chassis.moveToPoint(30, 12, 5000, {.maxSpeed = 60}, false);
+  chassis.moveToPoint(5, 27, 1000, {.forwards = false, .maxSpeed = 90}, false);
+  chassis.moveToPoint(33, 12, 2000, {.maxSpeed = 55}, false);
 
-  chassis.turnToHeading(180, 1300);
+  chassis.turnToHeading(180, 800);
   piston3.set_value(false); //put matchloader back down
-  //Note matchloader is already activated
-  chassis.moveToPoint(29, -8, 3500, {.maxSpeed = 45}); //NOTE: CHANGED THE X VALUE EVEN THOUGH IT SHOULD BE THE SAME AS ONE ABOVE
-  //Move to matchload with low velocity so it doesn't mess up odom
-  // chassis.moveToPoint(-32, -15, 5000, {.maxSpeed = 30});
+  chassis.moveToPoint(33, -8, 2000, {.maxSpeed = 62}); // slower for consistent matchload position
   
   //Matchload
-  matchload();
+  intake.telOP(true, false, false, false);
+  pros::delay(1200);
 
-  chassis.moveToPoint(29, 27, 2100, {.forwards = false, .maxSpeed = 50}, false);
+  chassis.moveToPoint(33, 27, 1200, {.forwards = false, .maxSpeed = 90}, false);
   //Score top while moving backwards
   piston1.set_value(false); //open up the hood
   intake.telOP(false, true, false, false);
-  chassis.moveToPoint(29, 40, 2000, {.forwards = false, .maxSpeed = 40}, false); // move back while scoring
+  //move backwards while scoring
+  chassis.moveToPoint(33, 40, 1200, {.forwards = false, .maxSpeed = 80}, false);
 
-  //WING PART
+  //WING PART -> should work once the bot is lined up good
   piston2.set_value(true);
-  chassis.moveToPoint(29, 18, 5000); //move back a bit
-  chassis.turnToHeading(270, 1300, {.minSpeed = 60});
-  chassis.moveToPoint(40, 20, 5000, {.forwards = false});
-  chassis.turnToHeading(180, 1300, {.minSpeed = 60});
-  chassis.moveToPoint(40, 35, 3000, {.forwards = false, .minSpeed = 60});
+  chassis.moveToPoint(33, 17, 1500); //move back a bit
+  chassis.turnToHeading(270, 1000, {.minSpeed = 50});
+  chassis.moveToPoint(45, 17, 1500, {.forwards = false});
+  chassis.turnToHeading(180, 1000, {.minSpeed = 50});
+  chassis.moveToPoint(45, 29, 1500, {.forwards = false, .minSpeed = 60});
 }
 
 /**
@@ -553,7 +607,9 @@ void autonomous() {
     // leftAuton();
     // tuningtest();
     // skills();
-    rightAuton();
+    // rightAuton();
+    // slowLeftAuton();
+    leftAuton();
     // scoreLow();
     // driveAlongWall(48);
 }
