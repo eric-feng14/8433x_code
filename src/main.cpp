@@ -33,6 +33,8 @@ pros::adi::DigitalOut piston2('B'); //wing
 pros::adi::DigitalOut piston3('C'); //matchloader
 pros::adi::DigitalOut piston4('D'); //low goal piston
 
+// piston3 = matchload, true = retracted
+
 Intake intake(roller_5, roller_6, roller_7);
 
 constexpr bool REV_LEFT_DRIVE  = false;
@@ -61,8 +63,7 @@ pros::Imu imu(10);
 
 //Distance sensor 
 pros::Distance frontDist(13);
-pros::Distance leftDist(12); 
-pros::Distance rightDist(14);
+pros::Distance backDist(14);
 
 // ============================================================
 // BASIC HELPERS
@@ -155,7 +156,7 @@ lemlib::ControllerSettings angular_controller(1.25, // proportional gain (kP)
 
 lemlib::Chassis chassis(drivetrain, lateral_controller, angular_controller, sensors);
 
-const int MOVE_TIMEOUT = 5000, TURN_TIMEOUT = 1000;
+const int MOVE_TIMEOUT = 2100, TURN_TIMEOUT = 1000;
 
 // ============================================================
 // PROS DEFAULTS
@@ -183,6 +184,70 @@ void initialize() {
 
 void disabled() {}
 void competition_initialize() {}
+
+void resetToDistance(int targetDist, bool useFront, int speed = 50) {
+    pros::delay(50);  // Allow sensor to stabilize
+    
+    pros::Distance& sensor = useFront ? frontDist : backDist;
+    int currentDist = sensor.get_distance();
+    
+    if (currentDist > 3000) {
+        pros::lcd::print(4, "Sensor error! Dist=%dmm", currentDist);
+        return;
+    }
+    
+    pros::lcd::print(4, "%s Target=%dmm Curr=%dmm", useFront ? "FRONT" : "BACK", targetDist, currentDist);
+    
+    const int MIN_SPEED = 10;  // Minimum speed to prevent stalling
+    const int SLOW_RANGE = 100;  // Start slowing down within 100mm of target
+    
+    if (useFront) {
+        if (currentDist > targetDist) {
+            while (sensor.get_distance() > targetDist) {
+                int dist = sensor.get_distance();
+                int error = dist - targetDist;
+                int moveSpeed = (error < SLOW_RANGE) ? (MIN_SPEED + (speed - MIN_SPEED) * error / SLOW_RANGE) : speed;
+                left_motors.move_velocity(moveSpeed);
+                right_motors.move_velocity(moveSpeed);
+                pros::delay(10);
+            }
+        } else if (currentDist < targetDist) {
+            while (sensor.get_distance() < targetDist) {
+                int dist = sensor.get_distance();
+                int error = targetDist - dist;
+                int moveSpeed = (error < SLOW_RANGE) ? (MIN_SPEED + (speed - MIN_SPEED) * error / SLOW_RANGE) : speed;
+                left_motors.move_velocity(-moveSpeed);
+                right_motors.move_velocity(-moveSpeed);
+                pros::delay(10);
+            }
+        }
+    } else {
+        if (currentDist > targetDist) {
+            while (sensor.get_distance() > targetDist) {
+                int dist = sensor.get_distance();
+                int error = dist - targetDist;
+                int moveSpeed = (error < SLOW_RANGE) ? (MIN_SPEED + (speed - MIN_SPEED) * error / SLOW_RANGE) : speed;
+                left_motors.move_velocity(-moveSpeed);
+                right_motors.move_velocity(-moveSpeed);
+                pros::delay(10);
+            }
+        } else if (currentDist < targetDist) {
+            while (sensor.get_distance() < targetDist) {
+                int dist = sensor.get_distance();
+                int error = targetDist - dist;
+                int moveSpeed = (error < SLOW_RANGE) ? (MIN_SPEED + (speed - MIN_SPEED) * error / SLOW_RANGE) : speed;
+                left_motors.move_velocity(moveSpeed);
+                right_motors.move_velocity(moveSpeed);
+                pros::delay(10);
+            }
+        }
+    }
+    
+    left_motors.move_velocity(0);
+    right_motors.move_velocity(0);
+    pros::lcd::print(5, "DONE! Final=%dmm", sensor.get_distance());
+}
+
 
 void leftside() { //arjun auton
   chassis.setPose(0, 0, 0);
@@ -232,10 +297,15 @@ void tuningtest() {
 
 void intakeTest() {
   //TEST LATER  
-  intake.telOP(false, false, true, false); //score mid testing ->works fine 
-  intake.telOP(true, false, false, false);
-  intake.telOP(false, true, false, false);
-
+  // intake.telOP(false, false, true, false); //score mid testing ->works fine 
+  // intake.telOP(true, false, false, false);
+  // intake.telOP(false, true, false, false);
+  piston3.set_value(true);
+  pros::delay(2000);
+  piston3.set_value(false);
+  /*
+  FOR MATCHLOADER -> TRUE = DOWN, FALSE = RETRACTED
+  */
 }
 
 void oldKennyAuton() {
@@ -287,13 +357,13 @@ void oldKennyAuton() {
 
 void matchload() {
   intake.telOP(true, false, false, false);
-  pros::delay(2500);
+  pros::delay(1500);
 }
 
 void scoreTop() {
   piston1.set_value(false); //lift hood up -> boolean is reversed
   intake.telOP(false, true, false, false);
-  pros::delay(2500);
+  pros::delay(4500);
 }
 
 void scoreLow() { //may need fixing later
@@ -369,13 +439,13 @@ void slowLeftAuton() {
   */
   chassis.setPose(0,0,0);
   
-  piston3.set_value(true); //start with matchloader retracted
+  piston3.set_value(false); //start with matchloader retracted
   piston2.set_value(false); //lift the wing so it doesn't interfere
   intake.telOP(true, false, false, false); //leave intake on
   chassis.moveToPoint(-5, 27, 5000, {.maxSpeed=40}, false); //move to the first 3 blocks
   
   //After arriving at the blocks, put matchloader down, moving forward a bit too
-  piston3.set_value(false);
+  piston3.set_value(true);
   pros::delay(400);
   chassis.moveToPoint(-10, 37, 5000, {.forwards = true, .maxSpeed = 80}); //move forward to gather the balls
   pros::delay(500);
@@ -391,20 +461,20 @@ void slowLeftAuton() {
   pros::delay(1500); //wait for the balls to enter the tube
   intake.telOP(false, false, false, false); //stop scoring mid
 
-  chassis.moveToPoint(-31, 10, 5000);
+  chassis.moveToPoint(-32, 10, 5000);
   chassis.turnToHeading(180, 1300);
   //Note matchloader is already activated
-  chassis.moveToPoint(-31, -7, 2500, {.maxSpeed = 50});
+  chassis.moveToPoint(-32, -7, 2500, {.maxSpeed = 50});
 
   matchload();
 
-  chassis.moveToPoint(-31, 30, 5000, {.forwards = false, .maxSpeed = 60}, false);
+  chassis.moveToPoint(-32, 30, 5000, {.forwards = false, .maxSpeed = 60}, false);
   
   scoreTop();
 
   //WING PART
   piston2.set_value(true);
-  chassis.moveToPoint(-31, 20, 5000); //move back a bit
+  chassis.moveToPoint(-32, 20, 5000); //move back a bit
   chassis.turnToHeading(90, 1300);
   chassis.moveToPoint(-20, 20, 5000);
   chassis.turnToHeading(180, 1300);
@@ -481,23 +551,23 @@ void rightAuton() {
   piston1 = hood
   piston2 = wing -> booleans are reversed
   piston3 = matchload
+  FOR MATCHLOADER -> TRUE = DOWN, FALSE = RETRACTED
   */
   chassis.setPose(0,0,0);
   
   piston4.set_value(false); //keep low goal piston retracted
-  piston3.set_value(true); //start with matchloader retracted
   piston2.set_value(false); //lift the wing so it doesn't interfere
   intake.telOP(true, false, false, false); //leave intake on
-  chassis.moveToPoint(5, 27, 1500, {.maxSpeed = 100}, false); //move to the first 3 blocks
+  chassis.moveToPoint(5, 27, 1500, {.maxSpeed = 40}, false); //move to the first 3 blocks
   
   //After arriving at the blocks, put matchloader down and switch intake on, moving forward a bit too
-  piston3.set_value(false);
-  pros::delay(100);
+  piston3.set_value(true);
+  pros::delay(500);
   
   chassis.moveToPoint(10, 37, 1200, {.forwards = true, .maxSpeed = 110}); //move forward to gather the balls
   pros::delay(150);
   //put matchloader back up
-  piston3.set_value(true);
+  piston3.set_value(false);
 
   //Intermediate point to help align with middle goal
   chassis.moveToPoint(9, 32, 1200, {.forwards = false});
@@ -515,28 +585,32 @@ void rightAuton() {
   chassis.moveToPoint(5, 27, 1000, {.forwards = false, .maxSpeed = 90}, false);
   chassis.moveToPoint(33, 12, 2000, {.maxSpeed = 55}, false);
 
+  //Reset distance with the right wall
+  chassis.turnToHeading(90, 1000);
+  resetToDistance(24, true);
+
   chassis.turnToHeading(180, 800);
-  piston3.set_value(false); //put matchloader back down
-  chassis.moveToPoint(33, -8, 2000, {.maxSpeed = 62}); // slower for consistent matchload position
+  piston3.set_value(true); //put matchloader back down
+  chassis.moveToPoint(32, -8, 2000, {.maxSpeed = 62}); // slower for consistent matchload position
   
   //Matchload
   intake.telOP(true, false, false, false);
-  pros::delay(1200);
+  pros::delay(2100);
 
-  chassis.moveToPoint(33, 27, 1200, {.forwards = false, .maxSpeed = 90}, false);
+  chassis.moveToPoint(32, 27, 1200, {.forwards = false, .maxSpeed = 90}, false);
   //Score top while moving backwards
   piston1.set_value(false); //open up the hood
   intake.telOP(false, true, false, false);
   //move backwards while scoring
-  chassis.moveToPoint(33, 40, 1200, {.forwards = false, .maxSpeed = 80}, false);
+  chassis.moveToPoint(32, 40, 1200, {.forwards = false, .maxSpeed = 80}, false);
 
   //WING PART -> should work once the bot is lined up good
-  piston2.set_value(true);
-  chassis.moveToPoint(33, 17, 1500); //move back a bit
-  chassis.turnToHeading(270, 1000, {.minSpeed = 50});
-  chassis.moveToPoint(45, 17, 1500, {.forwards = false});
-  chassis.turnToHeading(180, 1000, {.minSpeed = 50});
-  chassis.moveToPoint(45, 29, 1500, {.forwards = false, .minSpeed = 60});
+  // piston2.set_value(true);
+  // chassis.moveToPoint(32, 17, 1500); //move back a bit
+  // chassis.turnToHeading(270, 1000, {.minSpeed = 50});
+  // chassis.moveToPoint(45, 17, 1500, {.forwards = false});
+  // chassis.turnToHeading(180, 1000, {.minSpeed = 50});
+  // chassis.moveToPoint(45, 33, 1500, {.forwards = false, .minSpeed = 60});
 }
 
 /**
@@ -597,6 +671,20 @@ void driveAlongWall(double travelDistance, int basePower = 60, double kP = 3.0) 
   right_motors.move(0);
 }
 
+void wiggleSouth() {
+  for (int i = 0; i < 5; i++) {
+    chassis.turnToHeading(170, 670);
+    chassis.turnToHeading(190,670);
+  }
+}
+
+void wiggleNorth() {
+  for (int i = 0; i < 5; i++) {
+    chassis.turnToHeading(350, 670);
+    chassis.turnToHeading(10,670);
+  }
+}
+
 /*
 Autonomous skills started on feb 4 2026. Relies purely on odom, without any distance/optical sensors.
 */
@@ -609,7 +697,7 @@ void skills_cycle() {
   */
 
   //Piston starting setup
-  piston3.set_value(false); //keep matchload down
+  piston3.set_value(true); //keep matchload down
   piston2.set_value(false); // keep wing up
 
   chassis.moveToPoint(2, 40, MOVE_TIMEOUT);
@@ -617,14 +705,20 @@ void skills_cycle() {
   //move to the first matchload and matchload
   chassis.moveToPoint(-15, 40, MOVE_TIMEOUT);
   matchload();
+  //DO IT AGAIN
+  // chassis.moveToPoint(2, 40, MOVE_TIMEOUT, {.forwards = false});
+  // chassis.moveToPoint(-15, 40, MOVE_TIMEOUT);
+  // matchload();
+
+
   //Move back
   chassis.moveToPoint(2, 37, MOVE_TIMEOUT, {.forwards = false});
   chassis.turnToHeading(225, TURN_TIMEOUT);
   
-  chassis.moveToPoint(22, 48, MOVE_TIMEOUT,{.forwards = false, .maxSpeed = 67});
+  chassis.moveToPoint(22, 50, MOVE_TIMEOUT,{.forwards = false, .maxSpeed = 67});
   chassis.turnToHeading(270, TURN_TIMEOUT);
   
-  chassis.moveToPoint(95, 48, MOVE_TIMEOUT,{.forwards = false, .maxSpeed = 67});
+  chassis.moveToPoint(95, 50, MOVE_TIMEOUT,{.forwards = false, .maxSpeed = 67});
   chassis.turnToHeading(180, TURN_TIMEOUT);
   
   chassis.moveToPoint(95, 37, MOVE_TIMEOUT);
@@ -633,17 +727,30 @@ void skills_cycle() {
   //SCORE !!!
   chassis.moveToPoint(74, 37, MOVE_TIMEOUT, {.forwards = false});
   scoreTop(); //should open up hood
+  chassis.moveToPoint(85, 37, MOVE_TIMEOUT);
+  chassis.moveToPoint(74, 37, MOVE_TIMEOUT, {.forwards = false});
+  scoreTop();
 
   //move to second matchload -> this one caused some misalignment (maybe x value is too much)
-  chassis.moveToPoint(115, 37, MOVE_TIMEOUT, {.forwards = true, .maxSpeed = 67});
-  matchload();
+  chassis.moveToPoint(110, 37, MOVE_TIMEOUT, {.forwards = true, .maxSpeed = 50});
+  matchload(); pros::delay(1100);
+
+  //MATCHLOAD AGAIN
+  // chassis.moveToPoint(95, 37, MOVE_TIMEOUT, {.forwards = false, .maxSpeed = 50});
+  // chassis.moveToPoint(110, 37, MOVE_TIMEOUT, {.forwards = true, .maxSpeed = 50});
+  // matchload();
 
   //SCORE AGAIN!!
   chassis.moveToPoint(74, 37, MOVE_TIMEOUT, {.forwards = false});
   scoreTop();
+  // chassis.moveToPoint(85, 37, MOVE_TIMEOUT);
+  // chassis.moveToPoint(74, 37, MOVE_TIMEOUT, {.forwards = false});
+  // scoreTop();
 
   chassis.moveToPoint(95, 37, MOVE_TIMEOUT);
   chassis.turnToHeading(180, TURN_TIMEOUT);
+  //PUT MATCHLOADER BACK UP
+  piston3.set_value(false);
 
   //RECALIBRATE USING DISTANCE SENSOR
   
@@ -659,6 +766,8 @@ void skills() {
     chassis.moveToPoint(112, 16, 2000, {.forwards = true, .maxSpeed = 80});
     chassis.turnToHeading(180, 1000);
     intake.telOP(true, false, false, false); //intake on for park
+    chassis.moveToPoint(112, 6, 2000, {.forwards = true, .maxSpeed = 80});
+    piston3.set_value(true); //TRUE = DOWN
     chassis.moveToPoint(113, -10, 2000, {.forwards = true, .maxSpeed = 80});
 
   // chassis.moveToPoint(99, -13, MOVE_TIMEOUT, {}, false);
@@ -671,6 +780,36 @@ void skills() {
   // intake.telOP(true, false, false, false);
 }
 
+void newSkills() { //UPLOAD AGAIN AFTER
+  chassis.setPose(0,0,0);
+
+  piston3.set_value(true); //keep matchload down
+  piston2.set_value(false); // keep wing up
+
+  chassis.moveToPoint(-2, 37.5, MOVE_TIMEOUT);
+  chassis.turnToHeading(90, TURN_TIMEOUT);
+  //move to the first matchload and matchload
+  chassis.moveToPoint(15, 37.5, MOVE_TIMEOUT);
+  matchload();
+
+  chassis.moveToPoint(-23, 37, MOVE_TIMEOUT, {.forwards = false});
+  scoreTop(); 
+  piston3.set_value(false);
+
+  chassis.moveToPoint(-2, 37.5, MOVE_TIMEOUT);
+  chassis.turnToHeading(135, TURN_TIMEOUT);
+  chassis.moveToPoint(13, 15, MOVE_TIMEOUT);
+  chassis.moveToPose(18,15,180,MOVE_TIMEOUT);
+  intake.telOP(true, false, false, false);
+
+  // chassis.moveToPoint(18, 6, MOVE_TIMEOUT);
+  chassis.moveToPoint(15, -8, MOVE_TIMEOUT, {.minSpeed = 100});
+  pros::delay(1000);
+  piston3.set_value(true);// put matchload down
+  pros::delay(3000);
+  piston3.set_value(false);// put matchload down
+}
+
 
 void autonomous() {
     // leftSideAuton();
@@ -678,9 +817,11 @@ void autonomous() {
     // leftAuton();
     // tuningtest();
     // skills();
-    // rightAuton();
+    // newSkills();
+    // intakeTest();
+    rightAuton();
     // slowLeftAuton();
-    leftAuton();
+    // leftAuton();
     // scoreLow();
     // driveAlongWall(48);
 }
